@@ -85,13 +85,22 @@ USDT_TRC20_RECEIVE_ADDR=<测试收款地址>
 WEBHOOK_SECRET=staging_webhook_secret_2024
 USE_WEBHOOK=true
 BOT_SERVICE_PORT=8080
-DATABASE_URL=sqlite:///./tg_bot_staging.db
+DATABASE_URL=sqlite:////app/data/tg_bot.db
 REDIS_HOST=<Zeabur Redis 地址>
 REDIS_PASSWORD=<Zeabur Redis 密码>
 TRX_EXCHANGE_TEST_MODE=true
 ENV=staging
 TZ=Asia/Shanghai
 ```
+
+### Step 3.5: 配置持久化存储（重要！）⚠️
+> **不配置磁盘会导致每次重新部署数据丢失！**
+
+- [ ] 在 Zeabur 控制台点击「磁盘」
+- [ ] 添加磁盘，挂载路径填写：`/app/data`
+- [ ] 确认 `DATABASE_URL` 使用 4 个斜杠：`sqlite:////app/data/tg_bot.db`
+
+**数据库表会自动创建**，无需手动执行 SQL。
 
 ### Step 4: 获取域名并设置 Webhook URL
 - [ ] 部署完成后，获取 Zeabur 分配的域名（如 `your-app.zeabur.app`）
