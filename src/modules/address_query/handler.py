@@ -406,7 +406,10 @@ class AddressQueryModule(BaseModule):
                 
                 # 获取TRX余额（sun转换为TRX）
                 trx_balance_sun = account_data.get('balance', 0)
-                trx_balance = trx_balance_sun / 1_000_000  # 1 TRX = 1,000,000 sun
+                try:
+                    trx_balance = int(trx_balance_sun) / 1_000_000  # 1 TRX = 1,000,000 sun
+                except (ValueError, TypeError):
+                    trx_balance = 0
                 
                 # 获取USDT余额（TRC20）
                 usdt_balance = 0
@@ -414,8 +417,11 @@ class AddressQueryModule(BaseModule):
                 for token in trc20_tokens:
                     # USDT合约地址: TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
                     if 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t' in str(token):
-                        token_value = token.get(list(token.keys())[0], 0)
-                        usdt_balance = token_value / 1_000_000  # USDT也是6位小数
+                        token_value = token.get(list(token.keys())[0], '0')
+                        try:
+                            usdt_balance = int(token_value) / 1_000_000  # USDT也是6位小数
+                        except (ValueError, TypeError):
+                            usdt_balance = 0
                         break
                 
                 # 获取最近交易（简化版）
