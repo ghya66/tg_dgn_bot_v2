@@ -23,11 +23,12 @@ class Settings(BaseSettings):
     # HMAC 签名
     webhook_secret: str
     
-    # Redis
+    # Redis (支持 Zeabur 自动注入的环境变量)
     redis_host: str = "localhost"
     redis_port: int = 6379
     redis_db: int = 0
     redis_password: str = ""
+    redis_connection_string: str = ""  # Zeabur 注入的连接字符串（优先使用）
     
     # 订单设置
     order_timeout_minutes: int = 30

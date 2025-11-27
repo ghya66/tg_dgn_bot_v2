@@ -30,17 +30,12 @@ _redis_client: Optional[redis.Redis] = None
 
 
 async def _get_redis_client() -> Optional[redis.Redis]:
-    """惰性创建 Redis 客户端。"""
+    """惰性创建 Redis 客户端（支持 Zeabur 连接字符串）。"""
     global _redis_client
     if _redis_client is None:
         try:
-            _redis_client = redis.Redis(
-                host=settings.redis_host,
-                port=settings.redis_port,
-                db=settings.redis_db,
-                password=settings.redis_password or None,
-                decode_responses=True,
-            )
+            from ..common.redis_helper import create_redis_client
+            _redis_client = create_redis_client(decode_responses=True)
         except Exception as exc:  # pragma: no cover - 极端配置错误
             logger.warning("初始化 Redis 客户端失败: %s", exc)
             return None

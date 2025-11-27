@@ -36,14 +36,8 @@ class HealthService:
         try:
             client = redis_client
             if client is None:
-                redis = self._get_redis_module()
-                client = redis.Redis(
-                    host=settings.redis_host,
-                    port=settings.redis_port,
-                    db=settings.redis_db,
-                    password=settings.redis_password or None,
-                    decode_responses=True,
-                )
+                from .common.redis_helper import create_redis_client
+                client = create_redis_client(decode_responses=True)
             pong = await client.ping()
             return bool(pong), "Redis OK" if pong else "Redis ping failed"
         except Exception as e:

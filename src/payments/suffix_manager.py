@@ -21,15 +21,10 @@ class SuffixManager:
         self._cache_lock = asyncio.Lock()
         
     async def connect(self):
-        """连接Redis"""
+        """连接Redis（支持 Zeabur 连接字符串）"""
         if not self.redis_client:
-            self.redis_client = redis.Redis(
-                host=settings.redis_host,
-                port=settings.redis_port,
-                db=settings.redis_db,
-                password=settings.redis_password or None,
-                decode_responses=True
-            )
+            from ..common.redis_helper import create_redis_client
+            self.redis_client = create_redis_client(decode_responses=True)
     
     async def disconnect(self):
         """断开Redis连接"""

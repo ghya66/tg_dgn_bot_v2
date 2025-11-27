@@ -596,12 +596,16 @@ class AdminHandler:
             import redis
             from src.config import settings
             
-            r = redis.Redis(
-                host=settings.redis_host,
-                port=settings.redis_port,
-                db=settings.redis_db,
-                password=settings.redis_password or None
-            )
+            # 支持 Zeabur 连接字符串
+            if settings.redis_connection_string:
+                r = redis.Redis.from_url(settings.redis_connection_string)
+            else:
+                r = redis.Redis(
+                    host=settings.redis_host,
+                    port=settings.redis_port,
+                    db=settings.redis_db,
+                    password=settings.redis_password or None
+                )
             r.flushdb()
             
             audit_logger.log(
@@ -630,13 +634,16 @@ class AdminHandler:
             import redis
             from src.config import settings
             
-            # 检查 Redis
-            r = redis.Redis(
-                host=settings.redis_host,
-                port=settings.redis_port,
-                db=settings.redis_db,
-                password=settings.redis_password or None
-            )
+            # 检查 Redis（支持 Zeabur 连接字符串）
+            if settings.redis_connection_string:
+                r = redis.Redis.from_url(settings.redis_connection_string)
+            else:
+                r = redis.Redis(
+                    host=settings.redis_host,
+                    port=settings.redis_port,
+                    db=settings.redis_db,
+                    password=settings.redis_password or None
+                )
             redis_ok = r.ping()
             
             # 检查数据库
