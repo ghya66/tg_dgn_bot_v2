@@ -262,6 +262,7 @@ DATABASE_URL=sqlite:///./tg_bot.db
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_DB=0
+REDIS_PASSWORD=your_redis_password  # 如果 Redis 需要认证
 
 # Webhook 配置（可选）
 USE_WEBHOOK=false

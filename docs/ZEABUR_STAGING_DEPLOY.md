@@ -57,6 +57,7 @@ CMD ["python", "-m", "src.bot_v2"]
 | `LOG_LEVEL` | 日志级别 | `INFO` |
 | `TRX_EXCHANGE_TEST_MODE` | TRX 兑换测试模式 | `true` ⚠️ 必须 |
 | `REDIS_HOST` | Redis 地址 | Zeabur Redis 服务地址 |
+| `REDIS_PASSWORD` | Redis 密码 | Zeabur Redis 密码（如有） |
 | `ORDER_TIMEOUT_MINUTES` | 订单超时 | `30` |
 
 ---
@@ -85,6 +86,8 @@ WEBHOOK_SECRET=staging_webhook_secret_2024
 USE_WEBHOOK=true
 BOT_SERVICE_PORT=8080
 DATABASE_URL=sqlite:///./tg_bot_staging.db
+REDIS_HOST=<Zeabur Redis 地址>
+REDIS_PASSWORD=<Zeabur Redis 密码>
 TRX_EXCHANGE_TEST_MODE=true
 ENV=staging
 TZ=Asia/Shanghai
@@ -169,7 +172,8 @@ curl https://your-app.zeabur.app/api/health
 |------|----------|----------|
 | Bot 无响应 | Webhook URL 未设置 | 检查 `BOT_WEBHOOK_URL` |
 | 数据库错误 | 路径权限问题 | 确认 `DATABASE_URL` 路径正确 |
-| Redis 连接失败 | 未配置 Redis 服务 | 在 Zeabur 添加 Redis 服务并配置 `REDIS_HOST` |
+| Redis 连接失败 | 未配置 Redis 服务或密码 | 在 Zeabur 添加 Redis 服务并配置 `REDIS_HOST` + `REDIS_PASSWORD` |
+| Redis Authentication required | 缺少 Redis 密码 | 设置 `REDIS_PASSWORD` 环境变量 |
 | 按钮无响应 | Handler 未注册 | 查看日志确认模块加载成功 |
 
 ### 查看日志

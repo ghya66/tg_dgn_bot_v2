@@ -43,7 +43,10 @@ nano .env
 
 ## 可选配置：
 
-- `REDIS_URL` - 默认: `redis://localhost:6379/0`
+- `REDIS_HOST` - 默认: `localhost`
+- `REDIS_PORT` - 默认: `6379`
+- `REDIS_DB` - 默认: `0`
+- `REDIS_PASSWORD` - Redis 密码（如需要认证）
 - `DATABASE_URL` - 默认: `sqlite:///./bot_data.db`
 
 - `TRON_EXPLORER` - 默认: `tronscan` (可选 `oklink`)
