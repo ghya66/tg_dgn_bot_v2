@@ -599,7 +599,8 @@ class AdminHandler:
             r = redis.Redis(
                 host=settings.redis_host,
                 port=settings.redis_port,
-                db=settings.redis_db
+                db=settings.redis_db,
+                password=settings.redis_password or None
             )
             r.flushdb()
             
@@ -633,7 +634,8 @@ class AdminHandler:
             r = redis.Redis(
                 host=settings.redis_host,
                 port=settings.redis_port,
-                db=settings.redis_db
+                db=settings.redis_db,
+                password=settings.redis_password or None
             )
             redis_ok = r.ping()
             
