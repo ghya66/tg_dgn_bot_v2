@@ -15,7 +15,7 @@ class EnergyKeyboards:
             [InlineKeyboardButton("⚡ 时长能量（闪租）", callback_data="energy_type_hourly")],
             [InlineKeyboardButton("📦 笔数套餐", callback_data="energy_type_package")],
             [InlineKeyboardButton("🔄 闪兑", callback_data="energy_type_flash")],
-            [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")],
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
     

@@ -28,9 +28,9 @@ from .messages import EnergyMessages
 from .states import *
 from .keyboards import EnergyKeyboards
 
-# 从 legacy 导入业务逻辑类
-from src.legacy.energy.models import EnergyPackage, EnergyOrderType
-from src.legacy.address_query.validator import AddressValidator
+# 从本模块导入业务逻辑类
+from .models import EnergyPackage, EnergyOrderType
+from src.modules.address_query.validator import AddressValidator
 from src.config import settings
 from src.database import SessionLocal, EnergyOrder as DBEnergyOrder
 from src.common.settings_service import get_order_timeout_minutes
@@ -62,7 +62,7 @@ class EnergyModule(BaseModule):
         conv_handler = SafeConversationHandler.create(
             entry_points=[
                 CommandHandler("energy", self.start_energy),
-                CallbackQueryHandler(self.start_energy, pattern="^energy$"),
+                CallbackQueryHandler(self.start_energy, pattern="^(energy|menu_energy)$"),
                 MessageHandler(filters.Regex("^⚡ 能量兑换$"), self.start_energy),
             ],
             states={
@@ -75,9 +75,6 @@ class EnergyModule(BaseModule):
                 ],
                 STATE_INPUT_ADDRESS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, self.input_address),
-                ],
-                STATE_INPUT_COUNT: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.input_count),
                 ],
                 STATE_INPUT_USDT: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, self.input_usdt_amount),
@@ -92,7 +89,7 @@ class EnergyModule(BaseModule):
             },
             fallbacks=[
                 CallbackQueryHandler(self.cancel, pattern="^energy_cancel$"),
-                CallbackQueryHandler(self.cancel, pattern="^back_to_main$"),
+                # back_to_main 由 MainMenuModule 统一处理，避免冲突
                 CommandHandler("cancel", self.cancel),
             ],
             name="energy_conversation",
@@ -279,31 +276,6 @@ class EnergyModule(BaseModule):
         result = await self._show_payment_info(message, context)
         logger.info(f"_show_payment_info 返回状态: {result}")
         return result
-    
-    async def input_count(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        """输入购买笔数（笔数套餐）"""
-        message = update.message
-        
-        try:
-            count = int(message.text.strip())
-            if count < 1:
-                raise ValueError("笔数必须大于0")
-        except ValueError as e:
-            error_text = EnergyMessages.INVALID_AMOUNT.format(
-                error_message=self.formatter.escape_html(str(e))
-            )
-            await message.reply_text(text=error_text, parse_mode="HTML")
-            return STATE_INPUT_COUNT
-        
-        # 保存笔数
-        state = self.state_manager.get_state(context, self.module_name)
-        state["count"] = count
-        
-        # 请求输入地址
-        text = EnergyMessages.INPUT_ADDRESS
-        await message.reply_text(text=text, parse_mode="HTML")
-        
-        return STATE_INPUT_ADDRESS
     
     async def input_usdt_amount(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """输入USDT金额（笔数套餐/闪兑）"""

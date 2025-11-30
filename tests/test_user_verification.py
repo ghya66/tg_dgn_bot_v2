@@ -7,12 +7,11 @@ import os
 import sys
 from unittest.mock import MagicMock, patch
 from contextlib import contextmanager
-from datetime import datetime
 
 # 添加src到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.premium.user_verification import UserVerificationService
+from src.modules.premium.user_verification import UserVerificationService
 from src.database import UserBinding, init_db, Base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -37,7 +36,7 @@ class TestUserVerificationService:
             yield session
         
         # Mock get_db_context
-        with patch('src.premium.user_verification.get_db_context', mock_db_context):
+        with patch('src.modules.premium.user_verification.get_db_context', mock_db_context):
             yield session
                 
         # 清理
@@ -181,8 +180,8 @@ async def test_run_verification_ci():
     SessionLocal = sessionmaker(bind=engine)
     
     # Mock get_db 和 close_db
-    with patch('src.premium.user_verification.get_db') as mock_get_db:
-        with patch('src.premium.user_verification.close_db') as mock_close_db:
+    with patch('src.modules.premium.user_verification.get_db') as mock_get_db:
+        with patch('src.modules.premium.user_verification.close_db') as mock_close_db:
             mock_get_db.return_value = SessionLocal()
             mock_close_db.return_value = None
             

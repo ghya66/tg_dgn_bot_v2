@@ -1,0 +1,10 @@
+"""
+TRX兑换对话状态常量
+"""
+
+# 对话状态
+INPUT_AMOUNT = 0
+INPUT_ADDRESS = 1
+SHOW_PAYMENT = 2
+CONFIRM_PAYMENT = 3
+INPUT_TX_HASH = 4

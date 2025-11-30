@@ -17,7 +17,9 @@ from telegram.ext import (
     ContextTypes,
     BaseHandler,
     CommandHandler,
-    CallbackQueryHandler
+    CallbackQueryHandler,
+    MessageHandler,
+    filters,
 )
 
 from src.core.base import BaseModule
@@ -62,8 +64,14 @@ class MainMenuModule(BaseModule):
         """获取模块处理器"""
         return [
             CommandHandler("start", self.start_command),
-            CallbackQueryHandler(self.show_main_menu, pattern=r"^(back_to_main|nav_back_to_main|menu_back_to_main)$"),
+            CallbackQueryHandler(self.show_main_menu, pattern=r"^(back_to_main|nav_back_to_main|menu_back_to_main|addrq_back_to_main)$"),
             CallbackQueryHandler(self.handle_free_clone, pattern=r"^menu_clone$"),
+            CallbackQueryHandler(self.handle_support, pattern=r"^menu_support$"),
+            CallbackQueryHandler(self.handle_orders, pattern=r"^menu_orders$"),
+            # 底部键盘按钮处理器
+            MessageHandler(filters.Regex(r"^💱 实时汇率$"), self.show_rates),
+            MessageHandler(filters.Regex(r"^🎁 免费克隆$"), self.show_clone_message),
+            MessageHandler(filters.Regex(r"^👨‍💼 联系客服$"), self.show_support_message),
         ]
     
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -173,7 +181,7 @@ class MainMenuModule(BaseModule):
         
         keyboard = [
             [InlineKeyboardButton("👨‍💼 联系客服", callback_data="menu_support")],
-            [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
@@ -219,8 +227,8 @@ class MainMenuModule(BaseModule):
             # 返回默认按钮
             return [
                 [
-                    InlineKeyboardButton("💎 Premium直充", callback_data="menu_premium"),
-                    InlineKeyboardButton("🏠 个人中心", callback_data="menu_profile")
+                    InlineKeyboardButton("💎 Premium会员", callback_data="menu_premium"),
+                    InlineKeyboardButton("👤 个人中心", callback_data="menu_profile")
                 ],
                 [
                     InlineKeyboardButton("🔍 地址查询", callback_data="menu_address_query"),
@@ -237,11 +245,188 @@ class MainMenuModule(BaseModule):
         reply_keyboard = [
             [KeyboardButton("💎 Premium会员"), KeyboardButton("⚡ 能量兑换")],
             [KeyboardButton("🔍 地址查询"), KeyboardButton("👤 个人中心")],
-            [KeyboardButton("🔄 TRX 兑换"), KeyboardButton("👨‍💼 联系客服")],
-            [KeyboardButton("💵 实时U价"), KeyboardButton("🎁 免费克隆")],
+            [KeyboardButton("💱 TRX闪兑"), KeyboardButton("👨‍💼 联系客服")],
+            [KeyboardButton("💱 实时汇率"), KeyboardButton("🎁 免费克隆")],
         ]
         return ReplyKeyboardMarkup(
             reply_keyboard,
             resize_keyboard=True,
             one_time_keyboard=False,
+        )
+    
+    async def handle_support(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """处理联系客服按钮"""
+        from src.config import settings
+        
+        query = update.callback_query
+        await query.answer()
+        
+        # 从配置获取客服联系方式
+        support_contact = getattr(settings, 'support_contact', '@your_support_bot')
+        
+        text = (
+            "📞 <b>联系客服</b>\n\n"
+            f"如有任何问题，请联系客服：\n\n"
+            f"👨‍💼 {support_contact}\n\n"
+            "客服在线时间：09:00 - 23:00"
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=reply_markup
+        )
+    
+    async def handle_orders(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """处理我的订单按钮"""
+        from src.config import settings
+        
+        query = update.callback_query
+        await query.answer()
+        
+        user_id = update.effective_user.id
+        is_admin = user_id == getattr(settings, 'bot_owner_id', 0)
+        
+        if is_admin:
+            # 管理员：提示使用 /orders 命令
+            text = (
+                "📋 <b>订单管理</b>\n\n"
+                "请使用 /orders 命令进入订单管理系统。\n\n"
+                "您可以查看、筛选和管理所有订单。"
+            )
+        else:
+            # 普通用户：显示订单查询说明
+            text = (
+                "📋 <b>我的订单</b>\n\n"
+                "暂不支持用户自助查询订单。\n\n"
+                "如需查询订单状态，请联系客服提供订单号。"
+            )
+        
+        keyboard = [
+            [InlineKeyboardButton("📞 联系客服", callback_data="menu_support")],
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=reply_markup
+        )
+    
+    async def show_rates(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """
+        显示实时U价（底部键盘按钮）
+        调用 rates 服务获取 OKX C2C 汇率
+        """
+        from src.rates.service import fetch_usdt_cny_from_okx
+        
+        # 发送"正在获取"提示
+        processing_msg = await update.message.reply_text("🔄 正在获取实时汇率...")
+        
+        try:
+            # 获取汇率数据
+            channel_prices = await fetch_usdt_cny_from_okx()
+            
+            # 构建显示文本
+            lines = ["💵 <b>实时 USDT-CNY 汇率</b>\n"]
+            lines.append("数据来源: OKX C2C\n")
+            
+            for channel, data in channel_prices.items():
+                min_price = data.get("min_price")
+                merchants = data.get("merchants", [])
+                
+                channel_name = self.CHANNEL_TITLES.get(channel, channel)
+                icon = self.CHANNEL_ICONS.get(channel, "💰")
+                
+                if min_price:
+                    lines.append(f"\n{icon} <b>{channel_name}</b>")
+                    lines.append(f"最低价: <code>{min_price:.4f}</code> CNY")
+                    
+                    # 显示前几个商家
+                    if merchants:
+                        lines.append("商家报价:")
+                        for i, m in enumerate(merchants[:self.MAX_MERCHANT_ROWS]):
+                            nick = m.get("nickname", "商家")[:10]
+                            price = m.get("price", 0)
+                            lines.append(f"  {i+1}. {nick}: {price:.4f}")
+                else:
+                    lines.append(f"\n{icon} <b>{channel_name}</b>: 暂无数据")
+            
+            lines.append("\n\n⏰ 数据实时更新，仅供参考")
+            
+            text = "\n".join(lines)
+            
+        except Exception as e:
+            logger.error(f"获取汇率失败: {e}", exc_info=True)
+            text = "❌ <b>获取汇率失败</b>\n\n请稍后重试。"
+        
+        # 删除"正在获取"提示
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        
+        # 发送结果
+        keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=reply_markup
+        )
+    
+    async def show_clone_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """
+        显示免费克隆信息（底部键盘按钮）
+        """
+        text = get_content("clone_message", default=(
+            "🎁 <b>免费克隆</b>\n\n"
+            "本功能暂未开放，敬请期待！\n\n"
+            "如有需求，请联系客服咨询。"
+        ))
+        
+        keyboard = [
+            [InlineKeyboardButton("📞 联系客服", callback_data="menu_support")],
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=reply_markup
+        )
+    
+    async def show_support_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """
+        显示联系客服信息（底部键盘按钮）
+        """
+        from src.config import settings
+        
+        # 从配置获取客服联系方式
+        support_contact = getattr(settings, 'support_contact', '@your_support_bot')
+        
+        text = (
+            "📞 <b>联系客服</b>\n\n"
+            f"如有任何问题，请联系客服：\n\n"
+            f"👨‍💼 {support_contact}\n\n"
+            "客服在线时间：09:00 - 23:00"
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=reply_markup
         )

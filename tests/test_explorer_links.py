@@ -3,7 +3,7 @@
 """
 import pytest
 from unittest.mock import patch
-from src.address_query.explorer import explorer_links
+from src.modules.address_query.explorer import explorer_links
 
 
 class TestExplorerLinks:
@@ -11,7 +11,7 @@ class TestExplorerLinks:
     
     def test_tronscan_links(self):
         """测试 Tronscan 链接生成"""
-        with patch('src.address_query.explorer.settings') as mock_settings:
+        with patch('src.modules.address_query.explorer.settings') as mock_settings:
             mock_settings.tron_explorer = 'tronscan'
             
             address = "TLyqzVGLV1srkB7dToTAEqgDSfPtXRJZYH"
@@ -28,7 +28,7 @@ class TestExplorerLinks:
     
     def test_oklink_links(self):
         """测试 OKLink 链接生成"""
-        with patch('src.address_query.explorer.settings') as mock_settings:
+        with patch('src.modules.address_query.explorer.settings') as mock_settings:
             mock_settings.tron_explorer = 'oklink'
             
             address = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
@@ -45,7 +45,7 @@ class TestExplorerLinks:
     
     def test_default_to_tronscan(self):
         """测试默认使用 Tronscan"""
-        with patch('src.address_query.explorer.settings') as mock_settings:
+        with patch('src.modules.address_query.explorer.settings') as mock_settings:
             mock_settings.tron_explorer = 'unknown'
             
             address = "TN3W4H6rK2ce4vX9YnFQHwKENnHjoxb3m9"
@@ -56,7 +56,7 @@ class TestExplorerLinks:
     
     def test_case_insensitive(self):
         """测试大小写不敏感"""
-        with patch('src.address_query.explorer.settings') as mock_settings:
+        with patch('src.modules.address_query.explorer.settings') as mock_settings:
             mock_settings.tron_explorer = 'OKLINK'  # 大写
             
             address = "TAUN6FwrnwwmaEqYcckffC7wYmbaS6cBiX"
@@ -66,7 +66,7 @@ class TestExplorerLinks:
     
     def test_links_structure(self):
         """测试链接结构正确性"""
-        with patch('src.address_query.explorer.settings') as mock_settings:
+        with patch('src.modules.address_query.explorer.settings') as mock_settings:
             mock_settings.tron_explorer = 'tronscan'
             
             address = "TLyqzVGLV1srkB7dToTAEqgDSfPtXRJZYH"

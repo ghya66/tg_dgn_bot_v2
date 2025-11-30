@@ -37,18 +37,15 @@
 ### 模块结构
 
 ```text
-src/energy/
-├── __init__.py           # 模块导出
-
-├── models.py             # 数据模型（订单、套餐、状态）
-
-├── client.py             # API客户端（对接trxno.com）
-
-├── manager.py            # 订单管理器（创建、支付、查询）
-
-└── handler.py            # Bot处理器（对话流程）
-
-```text
+src/modules/energy/           # 标准化模块目录
+├── __init__.py               # 模块导出
+├── handler.py                # EnergyModule 处理器
+├── client.py                 # API客户端（对接trxno.com）
+├── models.py                 # 数据模型（Pydantic V2）
+├── keyboards.py              # 按钮配置
+├── messages.py               # 消息模板
+└── states.py                 # 对话状态定义
+```
 
 ### 数据流程
 

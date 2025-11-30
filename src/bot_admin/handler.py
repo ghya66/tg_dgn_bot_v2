@@ -557,6 +557,110 @@ class AdminHandler:
             parse_mode="HTML"
         )
     
+    # ==================== 文案编辑处理 ====================
+    
+    async def handle_welcome_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理欢迎语输入"""
+        new_text = update.message.text.strip()
+        
+        if len(new_text) < 10:
+            await update.message.reply_text("❌ 欢迎语太短，请输入至少10个字符：")
+            return EDITING_WELCOME
+        
+        success = config_manager.set_content(
+            "welcome_message", new_text, update.effective_user.id, "欢迎语"
+        )
+        
+        if success:
+            # 清除缓存
+            from src.common.content_service import clear_content_cache
+            clear_content_cache("welcome_message")
+            
+            audit_logger.log(
+                admin_id=update.effective_user.id,
+                action="update_content",
+                target="welcome_message",
+                details="更新欢迎语"
+            )
+            await update.message.reply_text(
+                "✅ <b>欢迎语已更新</b>\n\n"
+                "生效时间：立即\n\n"
+                "使用 /admin 返回管理面板",
+                parse_mode="HTML"
+            )
+        else:
+            await update.message.reply_text("❌ 保存失败，请稍后重试")
+        
+        return ConversationHandler.END
+    
+    async def handle_clone_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理免费克隆文案输入"""
+        new_text = update.message.text.strip()
+        
+        if len(new_text) < 10:
+            await update.message.reply_text("❌ 文案太短，请输入至少10个字符：")
+            return EDITING_CLONE
+        
+        success = config_manager.set_content(
+            "free_clone_message", new_text, update.effective_user.id, "免费克隆文案"
+        )
+        
+        if success:
+            from src.common.content_service import clear_content_cache
+            clear_content_cache("free_clone_message")
+            
+            audit_logger.log(
+                admin_id=update.effective_user.id,
+                action="update_content",
+                target="free_clone_message",
+                details="更新免费克隆文案"
+            )
+            await update.message.reply_text(
+                "✅ <b>免费克隆文案已更新</b>\n\n"
+                "生效时间：立即\n\n"
+                "使用 /admin 返回管理面板",
+                parse_mode="HTML"
+            )
+        else:
+            await update.message.reply_text("❌ 保存失败，请稍后重试")
+        
+        return ConversationHandler.END
+    
+    async def handle_support_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理客服联系方式输入"""
+        new_text = update.message.text.strip()
+        
+        # 简单验证
+        if not new_text.startswith("@") and not new_text.startswith("http"):
+            await update.message.reply_text("❌ 格式错误，请输入 @用户名 或链接：")
+            return EDITING_SUPPORT
+        
+        success = config_manager.set_content(
+            "support_contact", new_text, update.effective_user.id, "客服联系方式"
+        )
+        
+        if success:
+            from src.common.content_service import clear_content_cache
+            clear_content_cache("support_contact")
+            
+            audit_logger.log(
+                admin_id=update.effective_user.id,
+                action="update_content",
+                target="support_contact",
+                details=f"更新为 {new_text}"
+            )
+            await update.message.reply_text(
+                f"✅ <b>客服联系方式已更新</b>\n\n"
+                f"新设置：{new_text}\n"
+                f"生效时间：立即\n\n"
+                f"使用 /admin 返回管理面板",
+                parse_mode="HTML"
+            )
+        else:
+            await update.message.reply_text("❌ 保存失败，请稍后重试")
+        
+        return ConversationHandler.END
+    
     # ==================== 系统设置 ====================
     
     async def _show_settings_menu(self, query):
@@ -739,6 +843,24 @@ class AdminHandler:
                     MessageHandler(
                         filters.TEXT & ~filters.COMMAND,
                         self.handle_rate_limit_input
+                    )
+                ],
+                EDITING_WELCOME: [
+                    MessageHandler(
+                        filters.TEXT & ~filters.COMMAND,
+                        self.handle_welcome_input
+                    )
+                ],
+                EDITING_CLONE: [
+                    MessageHandler(
+                        filters.TEXT & ~filters.COMMAND,
+                        self.handle_clone_input
+                    )
+                ],
+                EDITING_SUPPORT: [
+                    MessageHandler(
+                        filters.TEXT & ~filters.COMMAND,
+                        self.handle_support_input
                     )
                 ],
             },

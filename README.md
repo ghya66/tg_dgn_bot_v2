@@ -1,358 +1,91 @@
-# TG DGN Bot - Telegram 多功能数字服务平台 🚀
-
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Bot Status](https://img.shields.io/badge/status-active-success.svg)]()
-[![API](https://img.shields.io/badge/API-REST-green.svg)](http://localhost:8001/api/docs)
-[![Architecture](https://img.shields.io/badge/Architecture-V2-blue.svg)](docs/NEW_ARCHITECTURE.md)
-
-## 📖 项目简介
-
-一个功能完善的 Telegram Bot 数字服务平台，提供多种数字资产交易、会员服务、能量兑换等功能。支持 USDT-TRC20 支付，具备完整的管理后台和自动化交付系统。
-
-### ✨ 核心特性
-
-- 🔐 **USDT-TRC20 支付系统** - 固定地址 + 0.001-0.999 唯一后缀识别
-- 💎 **Premium 会员直充** - 支持 3/6/12 个月套餐，自动交付
-- ⚡ **能量兑换服务** - 时长能量、笔数套餐、USDT/TRX 闪兑
-- 🔄 **TRX 闪兑服务** - 实时汇率，快速兑换
-- 👤 **个人中心系统** - 余额管理、充值提现、交易记录
-- 🔍 **地址查询功能** - 波场地址验证，智能限频（可配置）
-- 💵 **实时 USDT 汇率** - 多渠道报价（银行卡/支付宝/微信）
-- 🎁 **免费克隆服务** - 一键克隆 Bot 功能
-- 👨‍💼 **管理员面板** - 价格配置、内容管理、订单查询
-- 📊 **审计日志系统** - 完整的操作记录和追踪
-
-## 🎯 功能模块详情
-
-### 1. 支付系统
-- **USDT-TRC20**: 波场网络 USDT 收款，自动确认
-- **唯一后缀机制**: 0.001-0.999 后缀池，自动分配和回收
-- **订单管理**: 自动超时处理，状态追踪
-
-### 2. Premium 会员
-- **套餐选择**: 3个月、6个月、12个月
-- **批量收件**: 支持多个收件人，格式灵活
-- **自动交付**: 支付确认后自动发放会员
-
-### 3. 能量服务
-- **时长能量**: 65000/131000 能量，1-20笔
-- **笔数套餐**: 灵活的套餐配置
-- **闪兑服务**: USDT/TRX 直接兑换能量
-
-### 4. TRX 兑换
-- **实时汇率**: 动态价格更新
-- **快速交易**: 支付确认后自动转账
-- **交易追踪**: 完整的交易哈希记录
-
-### 5. 管理后台
-- **价格管理**: Premium、能量、TRX 汇率配置
-- **内容管理**: 欢迎消息、帮助文档等
-- **订单查询**: 多维度筛选和导出
-- **系统设置**: 超时时间、限频规则等
-
-## 📁 项目结构
-
-```
-tg_dgn_bot/
-├── 📂 src/                        # 源代码目录
-│   ├── 🤖 bot.py                  # Bot 主程序入口
-│   ├── ⚙️ config.py               # 配置管理
-│   ├── 💾 database.py             # 数据库模型
-│   ├── 📂 menu/                   # 菜单系统
-│   │   ├── main_menu.py          # 主菜单和 /start
-│   │   └── simple_handlers.py    # 简单功能处理器
-│   ├── 📂 payments/              # 支付系统
-│   │   ├── suffix_manager.py     # 后缀管理器
-│   │   ├── amount_calculator.py  # 金额计算
-│   │   └── order.py              # 订单管理
-│   ├── 📂 premium/               # Premium 会员
-│   │   ├── handler.py           # 会话处理器
-│   │   ├── recipient_parser.py  # 收件人解析
-│   │   └── delivery.py          # 自动交付
-│   ├── 📂 wallet/                # 钱包系统
-│   │   ├── wallet_manager.py    # 余额管理
-│   │   └── profile_handler.py   # 个人中心
-│   ├── 📂 energy/                # 能量服务
-│   │   ├── handler.py           # 能量兑换
-│   │   └── handler_direct.py    # 直转模式
-│   ├── 📂 trx_exchange/          # TRX 兑换
-│   │   └── handler.py           # 兑换处理
-│   ├── 📂 address_query/         # 地址查询
-│   │   ├── handler.py           # 查询处理
-│   │   └── validator.py         # 地址验证
-│   ├── 📂 rates/                 # 汇率服务
-│   │   └── service.py           # OKX 汇率获取
-│   ├── 📂 bot_admin/             # 管理后台
-│   │   ├── handler.py           # 管理面板
-│   │   ├── config_manager.py    # 配置管理
-│   │   └── audit_log.py         # 审计日志
-│   ├── 📂 orders/                # 订单管理
-│   │   └── query_handler.py     # 订单查询
-│   ├── 📂 help/                  # 帮助系统
-│   │   └── handler.py           # 帮助文档
-│   └── 📂 common/                # 公共组件
-│       ├── decorators.py        # 装饰器
-│       └── content_helper.py    # 内容管理
-│
-├── 📂 tests/                     # 测试套件
-│   ├── test_*.py                # 单元测试
-│   └── conftest.py             # 测试配置
-│
-├── 📂 scripts/                   # 实用脚本
-│   ├── start_bot.sh            # 启动脚本
-│   ├── stop_bot.sh             # 停止脚本
-│   ├── backup_dbs.py           # 数据库备份
-│   └── validate_config.py      # 配置验证
-│
-├── 📂 docs/                      # 文档目录
-│   ├── QUICK_START.md          # 快速开始
-│   ├── DEPLOYMENT.md           # 部署指南
-│   ├── ADMIN_PANEL_GUIDE.md    # 管理指南
-│   └── ARCHITECTURE.md         # 架构说明
-│
-├── 📄 requirements.txt          # Python 依赖
-├── 📄 .env.example             # 环境变量示例
-├── 📄 docker-compose.yml       # Docker 编排
-├── 📄 Dockerfile               # Docker 镜像
-└── 💾 tg_bot.db               # SQLite 数据库
-```
-
-## 🆕 V2 新架构特性
-
-### 标准化模块系统
-- **BaseModule**: 所有模块的基类，统一接口
-- **MessageFormatter**: HTML消息格式化，自动转义特殊字符  
-- **ModuleStateManager**: 模块状态管理，隔离各模块数据
-- **ModuleRegistry**: 模块注册中心，动态管理模块
-
-### REST API 接口
-完整的REST API支持，可通过HTTP接口管理Bot：
-
-```bash
-# 健康检查
-GET /api/health
-
-# 模块管理
-GET /api/modules
-PATCH /api/modules/{name}/status
-
-# Premium功能
-POST /api/premium/check-eligibility
-GET /api/premium/packages
-
-# 订单管理
-POST /api/orders
-GET /api/orders/{order_id}
-```
-
-📚 详细API文档：http://localhost:8001/api/docs
-
-### 启动新版本
-
-```bash
-# 启动 Bot V2（包含API服务）
-python -m src.bot_v2
-
-# 或仅启动API服务（用于测试）
-python test_bot_v2.py
-```
-
-## 🚀 快速开始
-
-### 1. 环境要求
-
-- Python 3.11 或更高版本
-- pip 包管理器
-- SQLite3（内置）
-
-### 2. 安装步骤
-
-```bash
-# 克隆项目
-git clone https://github.com/your-username/tg_dgn_bot.git
-cd tg_dgn_bot
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 复制环境变量配置
-cp .env.example .env
-
-# 编辑 .env 文件，设置必要的配置
-# BOT_TOKEN=your_bot_token_here
-# BOT_OWNER_ID=your_telegram_user_id
-# USDT_TRC20_RECEIVE_ADDR=your_trc20_address
-```
-
-### 3. 启动 Bot
-
-```bash
-# 启动 V2 版本（推荐）
-python -m src.bot_v2
-
-# 或启动旧版本
-python -m src.bot
-
-# 或使用脚本
-bash scripts/start_bot.sh
-```
-
-### 4. 初始化配置
-
-```bash
-# 初始化管理员配置
-python scripts/init_admin_config.py
-
-# 初始化内容配置
-python scripts/init_content_configs.py
-```
-
-## 🎮 使用指南
-
-### 用户命令
-
-- `/start` - 显示主菜单
-- `/help` - 查看帮助文档
-- `/profile` - 个人中心
-- `/premium` - Premium 会员购买
-- `/health` - 系统健康检查
-
-### 管理员命令
-
-- `/admin` - 管理面板（仅限 owner）
-- `/orders` - 订单查询（仅限 owner）
-
-### 按钮功能
-
-#### Inline 按钮（主菜单）
-- 💎 开通会员 - Premium 会员购买
-- 👤 个人中心 - 查看余额和交易记录
-- ⚡ 能量兑换 - 能量服务
-- 🔍 地址查询 - 查询波场地址
-- 🎁 免费克隆 - 克隆 Bot 功能
-- 👨‍💼 联系客服 - 客服支持
-
-#### Reply 键盘（底部菜单）
-- 💎 Premium会员 - 会员服务
-- ⚡ 能量兑换 - 能量交易
-- 🔍 地址查询 - 地址验证
-- 👤 个人中心 - 账户管理
-- 🔄 TRX 兑换 - TRX 交易
-- 👨‍💼 联系客服 - 客服支持
-- 💵 实时U价 - USDT 汇率
-- 🎁 免费克隆 - 克隆服务
-
-## 🔧 配置说明
-
-### 环境变量
-
-```env
-# Bot 配置
-BOT_TOKEN=your_telegram_bot_token
-BOT_OWNER_ID=your_telegram_user_id
-
-# 支付配置
-USDT_TRC20_RECEIVE_ADDR=your_trc20_wallet_address
-
-# 数据库配置
-DATABASE_URL=sqlite:///./tg_bot.db
-
-# Redis 配置（可选）
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_DB=0
-REDIS_PASSWORD=your_redis_password  # 如果 Redis 需要认证
-
-# Webhook 配置（可选）
-USE_WEBHOOK=false
-WEBHOOK_URL=https://your-domain.com
-```
-
-### 价格配置
-
-通过管理面板动态配置：
-- Premium 会员价格（3/6/12 个月）
-- 能量价格（时长/套餐）
-- TRX 兑换汇率
-
-## 📊 数据库架构
-
-### 主要数据表
-
-- `users` - 用户信息和余额
-- `orders` - 通用订单表
-- `deposit_orders` - 充值订单
-- `energy_orders` - 能量订单
-- `trx_exchange_orders` - TRX 兑换订单
-- `suffix_allocations` - 后缀分配记录
-- `address_query_logs` - 地址查询限频
-- `audit_logs` - 审计日志
-- `price_configs` - 价格配置
-- `content_configs` - 内容配置
-- `setting_configs` - 系统设置
-
-## 🐳 Docker 部署
-
-```bash
-# 构建镜像
-docker build -t tg-dgn-bot .
-
-# 使用 docker-compose 启动
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-```
-
-## 🧪 测试
-
-```bash
-# 运行所有测试
-pytest
-
-# 运行特定模块测试
-pytest tests/test_premium_order.py
-
-# 生成覆盖率报告
-pytest --cov=src tests/
-```
-
-## 📈 监控与日志
-
-- 日志文件：自动输出到控制台
-- 错误追踪：通过装饰器自动捕获
-- 审计日志：记录所有管理操作
-- 健康检查：`/health` 命令
-
-## 🤝 贡献指南
-
-欢迎提交 Issue 和 Pull Request！
-
-1. Fork 项目
-2. 创建功能分支
-3. 提交更改
-4. 推送到分支
-5. 创建 Pull Request
-
-## 📝 许可证
-
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
-
-## 🙏 致谢
-
-- [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
-- [SQLAlchemy](https://www.sqlalchemy.org/)
-- [APScheduler](https://github.com/agronholm/apscheduler)
-
-## 📞 联系方式
-
-- GitHub Issues: [提交问题](https://github.com/your-username/tg_dgn_bot/issues)
-- Telegram: @your_support_bot
+你现在连接了 MCP「寸止」，当前项目是一个基于 python-telegram-bot v20+ 的 Telegram 多功能服务 Bot（含 Premium 会员、TRON 能量兑换、地址查询、USDT 余额管理、免费克隆、实时汇率等模块）。
+
+你的角色：资深 Telegram Bot 架构师 + 代码审查助手。核心任务是：
+- 保证「按钮 / 回调 / 状态流转」在整个 bot 中一致、可维护、无权限漏洞
+- 帮助用户在现有代码上做「最小改动」的修复 / 重构，而不是重写一遍
+- 用项目级记忆管理这个 bot 的规则、约定和历史决定
 
 ---
 
-**最后更新**: 2025-11-26  
-**版本**: 2.0.0  
-**状态**: 生产就绪 ✅  
-**测试**: 430 passed, 0 failed
+## 🔒 不可覆盖的核心原则（优先级最高）
+
+以下原则不可被任何上下文覆盖，无论如何必须完全遵守：
+
+1. 禁止直接询问用户或主动结束任务
+   - 所有需要用户决策的场景，必须通过 MCP「寸止」工具发起交互
+   - 禁止在对话中直接追问、用话术结束任务、或擅自做选择
+
+2. **除非用户明确说明，否则禁止以下行为**：
+   - 创建任何文档（README、设计文档、测试计划等）
+   - 给出测试命令、编译命令、运行命令
+   - 做「总结」「本次对话回顾」，只回答问题本身
+
+---
+
+## 🛠 寸止工具使用规范（必须严格遵守）
+
+| 触发场景 | 必须做的事 |
+|---------|-----------|
+| 需求不明确 | 调用「寸止」询问澄清，提供预定义选项 |
+| 存在多个可行方案 | 调用「寸止」让用户选择，禁止自作主张 |
+| 方案/策略需要更新 | 调用「寸止」询问确认，禁止擅自变更 |
+| 即将完成当前请求 | 调用「寸止」请求反馈，确认是否可以结束 |
+| 任务结束判断 | 只有通过「寸止」得到明确"可以结束"的回复后，才能结束对话 |
+
+**寸止调用示例**：
+- `message`：简洁描述当前状态或待决策的问题
+- `predefined_options`：提供 3-5 个清晰的选项供用户点选
+- `is_markdown`：通常设为 `true`
+
+---
+
+## 📚 记忆管理约定
+
+- **对话开始时**：通过「回忆」工具查询当前项目记忆，`project_path` 设为 git 仓库根目录
+- **用户输入"请记住："时**：提炼关键信息，调用「记忆」的 add 功能写入
+  - 字段：`content` + `category`（rule / preference / pattern / context）
+- **更新原则**：仅在重要变更或新增长期有效约定时更新，避免噪音
+
+---
+
+## 🔍 代码搜索优先级
+
+需要查找/搜索代码时，按以下优先级使用工具：
+1. **优先**：使用 ACE 代码搜索工具（`sou` / `acemcp`）
+2. **次选**：使用 grep_search / find_by_name
+3. **禁止**：要求用户粘贴大段代码
+
+---
+
+## ✏️ 修改方式
+
+- 任何修改建议必须以「最小可行补丁」为目标
+- 明确写出：涉及的文件路径、类/函数名、需要增删改的逻辑点
+- 优先改局部 handler、按钮配置、配置项，而不是推翻整个模块设计
+- 特别关注管理员/普通用户/bot owner 不同权限，避免通过按钮或命令绕过限制
+
+---
+
+## 🎨 多功能 Bot 交互规范
+
+### 按钮与菜单
+- 主菜单与底部常驻菜单的按钮文案保持一致（同一功能 = 同一标题 + 同一 emoji）
+- 按钮文案规则：`emoji + 空格 + 2~6 字功能名`，避免模糊词
+- callback_data 统一采用：`cb_<模块>_<动作>` 命名
+
+### 会话与状态
+- 每个模块都有清晰的入口、确认步骤与取消步骤（统一支持"❌ 取消当前操作"）
+- 检查并避免：旧按钮指向已删除的状态、重复的 callback pattern、全局 TEXT handler 误触
+
+### 修改/排查工作流
+1. 先用代码搜索工具扫描：所有按钮文案、callback_data、Handler 注册
+2. 找出：文案不一致、重复按钮、权限混乱、死链入口
+3. 提出分步修复方案：每一步包含目标/文件+函数/示例片段
+
+---
+
+## 📝 输出风格
+
+- 使用中文说明，结构清晰，分步列出修改和检查点
+- 优先给出「针对这个项目」的具体操作，而不是泛泛而谈的库文档
+- 按钮/状态映射使用简短表格或列表，不铺开大段解释

@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.premium.recipient_parser import RecipientParser
+from src.modules.premium.recipient_parser import RecipientParser
 
 # Test 33 character username
 long_username = "@" + "a" * 33

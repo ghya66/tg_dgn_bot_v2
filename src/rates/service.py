@@ -48,52 +48,59 @@ async def fetch_usdt_cny_from_okx() -> Dict[str, Dict[str, Any]]:
         key: {"min_price": None, "merchants": []} for key in PAYMENT_METHODS
     }
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        for channel, payment_method in PAYMENT_METHODS.items():
-            params = {**OKX_C2C_COMMON_PARAMS, "paymentMethod": payment_method}
+    from src.common.http_utils import get_with_retry
+    
+    for channel, payment_method in PAYMENT_METHODS.items():
+        params = {**OKX_C2C_COMMON_PARAMS, "paymentMethod": payment_method}
+        try:
+            # 只读查询操作，可使用自动重试
+            response = await get_with_retry(
+                OKX_C2C_URL,
+                params=params,
+                timeout=settings.okx_timeout_secs,
+                retries=2,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as exc:  # pragma: no cover - 网络异常
+            logger.warning("OKX C2C 请求失败 (%s): %s", channel, exc)
+            continue
+
+        code = str(payload.get("code", ""))
+        if code != "0":
+            msg = payload.get("msg", "OKX response error")
+            logger.warning("OKX C2C 返回错误 (%s): %s %s", channel, code, msg)
+            continue
+
+        data = payload.get("data") or {}
+        items = None
+        if isinstance(data, dict):
+            items = data.get("sell") or data.get("items") or data.get("buy")
+
+        if not isinstance(items, list) or not items:
+            logger.warning("OKX C2C 数据为空 (%s): %s", channel, json.dumps(payload)[:200])
+            continue
+
+        merchants: List[Dict[str, Any]] = []
+        for entry in items[:10]:
+            if not isinstance(entry, dict):
+                continue
+            price_str = entry.get("price")
             try:
-                response = await client.get(OKX_C2C_URL, params=params)
-                response.raise_for_status()
-                payload = response.json()
-            except Exception as exc:  # pragma: no cover - 网络异常
-                logger.warning("OKX C2C 请求失败 (%s): %s", channel, exc)
+                price_val = round(float(price_str), 4)
+            except (TypeError, ValueError):
+                logger.warning("OKX C2C 价格解析失败 (%s): %s", channel, price_str)
                 continue
 
-            code = str(payload.get("code", ""))
-            if code != "0":
-                msg = payload.get("msg", "OKX response error")
-                logger.warning("OKX C2C 返回错误 (%s): %s %s", channel, code, msg)
-                continue
+            name = entry.get("nickName") or entry.get("merchantId") or entry.get("publicUserId") or "商家"
+            merchants.append({
+                "price": price_val,
+                "name": name,
+            })
 
-            data = payload.get("data") or {}
-            items = None
-            if isinstance(data, dict):
-                items = data.get("sell") or data.get("items") or data.get("buy")
-
-            if not isinstance(items, list) or not items:
-                logger.warning("OKX C2C 数据为空 (%s): %s", channel, json.dumps(payload)[:200])
-                continue
-
-            merchants: List[Dict[str, Any]] = []
-            for entry in items[:10]:
-                if not isinstance(entry, dict):
-                    continue
-                price_str = entry.get("price")
-                try:
-                    price_val = round(float(price_str), 4)
-                except (TypeError, ValueError):
-                    logger.warning("OKX C2C 价格解析失败 (%s): %s", channel, price_str)
-                    continue
-
-                name = entry.get("nickName") or entry.get("merchantId") or entry.get("publicUserId") or "商家"
-                merchants.append({
-                    "price": price_val,
-                    "name": name,
-                })
-
-            if merchants:
-                channel_prices[channel]["min_price"] = merchants[0]["price"]
-                channel_prices[channel]["merchants"] = merchants
+        if merchants:
+            channel_prices[channel]["min_price"] = merchants[0]["price"]
+            channel_prices[channel]["merchants"] = merchants
 
     if not any(info.get("min_price") is not None for info in channel_prices.values()):
         raise ValueError("OKX C2C 返回为空或不可用")

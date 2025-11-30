@@ -137,9 +137,9 @@ class TestPremiumStandardModule:
         # 验证消息内容
         text = call_args[0][0]
         assert "<b>Premium 会员开通</b>" in text
-        assert "3个月 - $16.0 USDT" in text
+        assert "3个月 - $17.0 USDT" in text
         assert "6个月 - $25.0 USDT" in text
-        assert "12个月 - $35.0 USDT" in text
+        assert "12个月 - $40.0 USDT" in text
     
     @pytest.mark.asyncio
     async def test_select_self_no_username(self, premium_module):
@@ -220,7 +220,7 @@ class TestPremiumStandardModule:
         assert "<b>为他人开通 Premium</b>" in text
     
     @pytest.mark.asyncio
-    @patch('src.premium.recipient_parser.RecipientParser')
+    @patch('src.modules.premium.recipient_parser.RecipientParser')
     async def test_username_entered_invalid(self, mock_parser, premium_module):
         """测试输入无效用户名"""
         mock_parser.validate_username.return_value = False
@@ -241,7 +241,7 @@ class TestPremiumStandardModule:
         assert "用户名格式无效" in text
     
     @pytest.mark.asyncio
-    @patch('src.premium.recipient_parser.RecipientParser')
+    @patch('src.modules.premium.recipient_parser.RecipientParser')
     async def test_username_entered_valid(self, mock_parser, premium_module):
         """测试输入有效用户名"""
         mock_parser.validate_username.return_value = True

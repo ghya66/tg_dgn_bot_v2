@@ -11,7 +11,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.premium.handler_v2 import PremiumHandlerV2
+from src.modules.premium.handler_v2 import PremiumHandlerV2
 from src.common.navigation_manager import NavigationManager
 
 

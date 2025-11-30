@@ -220,6 +220,7 @@ class PremiumOrder(Base):
     expires_at = Column(DateTime, nullable=False)
     tx_hash = Column(String(100), nullable=True)
     delivery_result = Column(Text, nullable=True)
+    fail_reason = Column(String(500), nullable=True)  # 发货失败原因
     
     # 索引
     __table_args__ = (

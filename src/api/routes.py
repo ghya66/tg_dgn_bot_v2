@@ -201,7 +201,7 @@ async def check_premium_eligibility(
     _: str = Depends(api_key_auth)
 ):
     """检查用户是否可以开通Premium"""
-    from src.premium.user_verification import get_user_verification_service
+    from src.modules.premium.user_verification import get_user_verification_service
     from src.config import settings
     
     verification_service = get_user_verification_service(settings.bot_username or "bot")
@@ -449,8 +449,8 @@ async def get_usdt_rates():
 @router.get("/energy/packages", tags=["Energy"])
 async def get_energy_packages():
     """获取能量套餐列表"""
-    # 从 legacy 导入业务逻辑类
-    from src.legacy.energy.models import EnergyPackage, EnergyPriceConfig
+    # 从标准化模块导入业务逻辑类
+    from src.modules.energy.models import EnergyPackage, EnergyPriceConfig
     
     config = EnergyPriceConfig()
     packages = [
@@ -469,8 +469,8 @@ async def calculate_energy_price(
     energy_amount: int
 ):
     """计算能量价格"""
-    # 从 legacy 导入业务逻辑类
-    from src.legacy.energy.models import EnergyPriceConfig
+    # 从标准化模块导入业务逻辑类
+    from src.modules.energy.models import EnergyPriceConfig
     
     config = EnergyPriceConfig()
     if energy_amount == 65000:
@@ -483,4 +483,248 @@ async def calculate_energy_price(
     return {
         "success": True,
         "data": {"energy_amount": energy_amount, "price_trx": price}
+    }
+
+
+# ==================== 能量 trxno API 对接接口 ====================
+
+# 全局 API 客户端实例（延迟初始化）
+_energy_api_client = None
+
+
+def get_energy_api_client():
+    """获取能量 API 客户端单例"""
+    global _energy_api_client
+    if _energy_api_client is None:
+        from src.modules.energy.client import EnergyAPIClient
+        from src.config import settings
+        _energy_api_client = EnergyAPIClient(
+            username=settings.energy_api_username,
+            password=settings.energy_api_password,
+            base_url=settings.energy_api_base_url,
+            backup_url=settings.energy_api_backup_url,
+        )
+    return _energy_api_client
+
+
+class EnergyBuyRequest(BaseModel):
+    """购买能量请求"""
+    receive_address: str  # 接收能量的地址
+    energy_amount: int = 65000  # 能量数量: 65000 或 131000
+    rent_time: int = 1  # 租用时长（小时），当前仅支持1
+
+
+class EnergyPackageBuyRequest(BaseModel):
+    """购买笔数套餐请求"""
+    receive_address: str  # 接收能量的地址
+
+
+class EnergyActivateRequest(BaseModel):
+    """激活地址请求"""
+    target_address: str  # 要激活的地址
+
+
+@router.get("/energy/account", tags=["Energy"])
+async def get_energy_account(
+    _: str = Depends(api_key_auth)
+):
+    """
+    查询 trxno 代理账户信息（需要认证）
+    
+    返回代理账户的 TRX/USDT 余额和冻结金额
+    """
+    try:
+        client = get_energy_api_client()
+        account_info = await client.get_account_info()
+        
+        return {
+            "success": True,
+            "data": {
+                "username": account_info.username,
+                "balance_trx": account_info.balance_trx,
+                "balance_usdt": account_info.balance_usdt,
+                "frozen_balance": account_info.frozen_balance
+            }
+        }
+    except Exception as e:
+        logger.error(f"查询能量账户失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/energy/prices", tags=["Energy"])
+async def get_energy_prices():
+    """
+    查询 trxno 实时能量价格
+    
+    从 trxno.com API 获取最新的能量价格
+    """
+    try:
+        client = get_energy_api_client()
+        price_info = await client.query_price()
+        
+        return {
+            "success": True,
+            "data": {
+                "energy_65k_price": price_info.energy_65k_price,
+                "energy_131k_price": price_info.energy_131k_price,
+                "package_price": price_info.package_price,
+                "source": "trxno.com"
+            }
+        }
+    except Exception as e:
+        logger.error(f"查询能量价格失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/energy/buy-hourly", tags=["Energy"])
+async def buy_hourly_energy(
+    request: EnergyBuyRequest,
+    _: str = Depends(api_key_auth)
+):
+    """
+    购买时长能量（需要认证）
+    
+    调用 trxno /api/buyenergy 为指定地址购买能量
+    - receive_address: 接收能量的波场地址
+    - energy_amount: 能量数量（65000 或 131000）
+    - rent_time: 租用时长（小时），当前仅支持 1
+    """
+    try:
+        # 验证能量数量
+        if request.energy_amount not in [65000, 131000]:
+            raise HTTPException(
+                status_code=400,
+                detail="energy_amount 必须是 65000 或 131000"
+            )
+        
+        client = get_energy_api_client()
+        response = await client.buy_energy(
+            receive_address=request.receive_address,
+            energy_amount=request.energy_amount,
+            rent_time=request.rent_time
+        )
+        
+        return {
+            "success": True,
+            "data": {
+                "order_id": response.order_id,
+                "code": response.code,
+                "msg": response.msg,
+                "details": response.data
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"购买时长能量失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/energy/buy-package", tags=["Energy"])
+async def buy_energy_package(
+    request: EnergyPackageBuyRequest,
+    _: str = Depends(api_key_auth)
+):
+    """
+    购买笔数套餐（需要认证）
+    
+    调用 trxno /api/buypackage 为指定地址购买笔数套餐
+    - receive_address: 接收能量的波场地址
+    """
+    try:
+        client = get_energy_api_client()
+        response = await client.buy_package(
+            receive_address=request.receive_address
+        )
+        
+        return {
+            "success": True,
+            "data": {
+                "order_id": response.order_id,
+                "code": response.code,
+                "msg": response.msg,
+                "details": response.data
+            }
+        }
+    except Exception as e:
+        logger.error(f"购买笔数套餐失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/energy/orders/{order_id}", tags=["Energy"])
+async def query_energy_order(
+    order_id: str,
+    _: str = Depends(api_key_auth)
+):
+    """
+    查询能量订单状态（需要认证）
+    
+    调用 trxno /api/order 查询订单状态
+    """
+    try:
+        client = get_energy_api_client()
+        response = await client.query_order(order_id)
+        
+        return {
+            "success": True,
+            "data": {
+                "order_id": order_id,
+                "code": response.code,
+                "msg": response.msg,
+                "details": response.data
+            }
+        }
+    except Exception as e:
+        logger.error(f"查询能量订单失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/energy/activate", tags=["Energy"])
+async def activate_address(
+    request: EnergyActivateRequest,
+    _: str = Depends(api_key_auth)
+):
+    """
+    激活波场地址（需要认证）
+    
+    调用 trxno /api/activate 激活未激活的地址
+    - target_address: 要激活的波场地址
+    """
+    try:
+        client = get_energy_api_client()
+        response = await client.activate_address(
+            target_address=request.target_address
+        )
+        
+        return {
+            "success": True,
+            "data": {
+                "target_address": request.target_address,
+                "code": response.code,
+                "msg": response.msg,
+                "details": response.data
+            }
+        }
+    except Exception as e:
+        logger.error(f"激活地址失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/energy/config", tags=["Energy"])
+async def get_energy_config():
+    """
+    获取能量兑换配置信息
+    
+    返回收款地址等配置（不包含敏感信息）
+    """
+    from src.config import settings
+    
+    return {
+        "success": True,
+        "data": {
+            "rent_address": settings.energy_rent_address or "未配置",
+            "package_address": settings.energy_package_address or "未配置",
+            "flash_address": settings.energy_flash_address or "未配置",
+            "api_configured": bool(settings.energy_api_username and settings.energy_api_password)
+        }
     }

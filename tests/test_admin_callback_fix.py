@@ -62,7 +62,6 @@ class TestAdminCallbackFix:
             "admin_settings_rate_limit",
             "admin_settings_clear_cache",
             "admin_settings_status",
-            "admin_confirm_delete",  # confirm操作也加了admin_前缀
         ]
         
         for callback in admin_callbacks:
@@ -122,14 +121,6 @@ class TestAdminCallbackFix:
                     assert button.callback_data.startswith("admin_"), \
                         f"系统设置菜单按钮callback_data未加admin_前缀: {button.callback_data}"
         
-        # 测试确认操作菜单
-        confirm_menu = menus.confirm_action("delete")
-        for row in confirm_menu.inline_keyboard:
-            for button in row:
-                if button.callback_data and button.callback_data != "admin_main":
-                    assert button.callback_data.startswith("admin_confirm_"), \
-                        f"确认菜单按钮callback_data未加admin_confirm_前缀: {button.callback_data}"
-    
     @pytest.mark.asyncio
     async def test_admin_handler_callback_routing(self):
         """测试AdminHandler的回调路由是否正确"""

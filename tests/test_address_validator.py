@@ -2,7 +2,7 @@
 地址验证器测试
 """
 import pytest
-from src.address_query.validator import AddressValidator
+from src.modules.address_query.validator import AddressValidator
 
 
 class TestAddressValidator:

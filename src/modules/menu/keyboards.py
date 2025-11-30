@@ -12,15 +12,15 @@ class MenuKeyboards:
         """主菜单内联键盘"""
         keyboard = [
             [
-                InlineKeyboardButton("💎 Premium 开通", callback_data="menu_premium"),
+                InlineKeyboardButton("💎 Premium会员", callback_data="menu_premium"),
                 InlineKeyboardButton("⚡ 能量兑换", callback_data="menu_energy"),
             ],
             [
-                InlineKeyboardButton("💱 TRX 兑换", callback_data="menu_trx"),
-                InlineKeyboardButton("🔍 地址查询", callback_data="menu_address"),
+                InlineKeyboardButton("💱 TRX闪兑", callback_data="menu_trx_exchange"),
+                InlineKeyboardButton("🔍 地址查询", callback_data="menu_address_query"),
             ],
             [
-                InlineKeyboardButton("💰 我的钱包", callback_data="menu_wallet"),
+                InlineKeyboardButton("👤 个人中心", callback_data="menu_profile"),
                 InlineKeyboardButton("📋 我的订单", callback_data="menu_orders"),
             ],
             [
@@ -45,14 +45,7 @@ class MenuKeyboards:
     def back_to_main() -> InlineKeyboardMarkup:
         """返回主菜单按钮"""
         keyboard = [[
-            InlineKeyboardButton("🔙 返回主菜单", callback_data="menu_back_to_main")
+            InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")
         ]]
         return InlineKeyboardMarkup(keyboard)
     
-    @staticmethod
-    def cancel_button() -> InlineKeyboardMarkup:
-        """取消按钮"""
-        keyboard = [[
-            InlineKeyboardButton("❌ 取消", callback_data="menu_cancel")
-        ]]
-        return InlineKeyboardMarkup(keyboard)

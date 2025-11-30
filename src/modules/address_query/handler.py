@@ -27,9 +27,9 @@ from .messages import AddressQueryMessages
 from .states import *
 from .keyboards import AddressQueryKeyboards
 
-# 从 legacy 导入业务逻辑类
-from src.legacy.address_query.validator import AddressValidator
-from src.legacy.address_query.explorer import explorer_links
+# 从本模块导入业务逻辑类
+from .validator import AddressValidator
+from src.clients.tron import TronAPIClient
 from src.database import SessionLocal, AddressQueryLog
 from src.common.settings_service import get_address_cooldown_minutes
 
@@ -44,6 +44,7 @@ class AddressQueryModule(BaseModule):
         self.formatter = MessageFormatter()
         self.state_manager = ModuleStateManager()
         self.validator = AddressValidator()
+        self.tron_client = TronAPIClient()
     
     @property
     def module_name(self) -> str:
@@ -60,7 +61,7 @@ class AddressQueryModule(BaseModule):
         conv_handler = SafeConversationHandler.create(
             entry_points=[
                 CommandHandler("query", self.start_query),
-                CallbackQueryHandler(self.start_query, pattern="^address_query$"),
+                CallbackQueryHandler(self.start_query, pattern="^(address_query|menu_address_query)$"),
                 MessageHandler(filters.Regex("^🔍 地址查询$"), self.start_query),
             ],
             states={
@@ -70,7 +71,7 @@ class AddressQueryModule(BaseModule):
             },
             fallbacks=[
                 CallbackQueryHandler(self.cancel, pattern="^addrq_cancel$"),
-                CallbackQueryHandler(self.cancel, pattern="^addrq_back_to_main$"),
+                # addrq_back_to_main 由 MainMenuModule 统一处理，避免冲突
                 CommandHandler("cancel", self.cancel),
             ],
             name="address_query_conversation",
@@ -91,12 +92,10 @@ class AddressQueryModule(BaseModule):
         
         # 检查限频
         can_query, remaining_minutes = self._check_rate_limit(user_id)
-        cooldown_minutes = get_address_cooldown_minutes()
         
         if not can_query:
             text = AddressQueryMessages.RATE_LIMIT.format(
-                remaining_minutes=remaining_minutes,
-                cooldown_minutes=cooldown_minutes
+                remaining_minutes=remaining_minutes
             )
             
             keyboard = [[InlineKeyboardButton("🔙 返回", callback_data="addrq_back_to_main")]]
@@ -155,9 +154,7 @@ class AddressQueryModule(BaseModule):
             is_valid, error_msg = self.validator.validate(address)
             
             if not is_valid:
-                text = AddressQueryMessages.INVALID_ADDRESS.format(
-                    error_msg=self.formatter.escape_html(error_msg)
-                )
+                text = AddressQueryMessages.INVALID_ADDRESS
                 keyboard = [[InlineKeyboardButton("❌ 取消", callback_data="addrq_cancel")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await update.message.reply_text(
@@ -169,12 +166,10 @@ class AddressQueryModule(BaseModule):
             
             # 再次检查限频（防止绕过）
             can_query, remaining_minutes = self._check_rate_limit(user_id)
-            cooldown_minutes = get_address_cooldown_minutes()
             
             if not can_query:
                 text = AddressQueryMessages.RATE_LIMIT.format(
-                    remaining_minutes=remaining_minutes,
-                    cooldown_minutes=cooldown_minutes
+                    remaining_minutes=remaining_minutes
                 )
                 keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="addrq_back_to_main")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
@@ -191,20 +186,20 @@ class AddressQueryModule(BaseModule):
             # 显示查询中提示
             processing_msg = await update.message.reply_text(AddressQueryMessages.PROCESSING)
             
-            # 获取地址信息
-            address_info = await self._fetch_address_info(address)
+            # 获取地址信息（使用统一客户端）
+            address_info = await self.tron_client.get_address_info(address)
             
             # 生成浏览器链接
-            links = explorer_links(address)
+            links = TronAPIClient.get_explorer_links(address)
             
             # 构建响应消息
             if address_info:
-                # 有API数据
-                trx_balance = address_info.get('trx_balance', '0')
-                usdt_balance = address_info.get('usdt_balance', '0')
+                # 有API数据（AddressInfo dataclass）
+                trx_balance = address_info.format_trx()
+                usdt_balance = address_info.format_usdt()
                 
                 # 处理最近交易
-                txs = address_info.get('recent_txs', [])
+                txs = address_info.recent_txs
                 if txs:
                     transaction_list = ""
                     for idx, tx in enumerate(txs[:5], 1):
@@ -344,123 +339,4 @@ class AddressQueryModule(BaseModule):
         finally:
             db.close()
     
-    async def _fetch_address_info(self, address: str) -> Optional[Dict]:
-        """
-        获取地址信息（使用TronGrid API）
-        
-        Args:
-            address: TRON地址
-            
-        Returns:
-            地址信息字典或None
-        """
-        try:
-            import httpx
-            from src.config import settings
-            
-            logger.info(f"尝试获取地址信息: {address}")
-            
-            # 使用TronGrid API获取真实数据
-            api_url = getattr(settings, 'tron_api_url', 'https://api.trongrid.io')
-            api_key = getattr(settings, 'tron_api_key', None)
-            
-            headers = {
-                'Accept': 'application/json'
-            }
-            
-            # 尝试使用API密钥
-            use_api_key = api_key and api_key.strip()
-            if use_api_key:
-                headers['TRON-PRO-API-KEY'] = api_key.strip()
-                logger.info(f"使用API密钥请求: {api_key[:10]}...")
-            else:
-                logger.info("使用公共API（无密钥）")
-            
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                # 获取账户信息
-                account_url = f"{api_url}/v1/accounts/{address}"
-                logger.info(f"请求TronGrid API: {account_url}")
-                
-                response = await client.get(account_url, headers=headers)
-                
-                # 如果401且使用了密钥，尝试不使用密钥（降级到公共API）
-                if response.status_code == 401 and use_api_key:
-                    logger.warning(f"API密钥无效(401)，尝试使用公共API")
-                    headers.pop('TRON-PRO-API-KEY', None)
-                    response = await client.get(account_url, headers=headers)
-                
-                # 如果仍然不是200，记录详细错误并返回None
-                if response.status_code != 200:
-                    logger.error(
-                        f"TronGrid API请求失败: "
-                        f"状态码={response.status_code}, "
-                        f"URL={account_url}, "
-                        f"响应={response.text[:500]}"
-                    )
-                    return None
-                
-                data = response.json()
-                
-                # 解析账户信息
-                account_data = data.get('data', [{}])[0] if data.get('data') else {}
-                
-                # 获取TRX余额（sun转换为TRX）
-                trx_balance_sun = account_data.get('balance', 0)
-                try:
-                    trx_balance = int(trx_balance_sun) / 1_000_000  # 1 TRX = 1,000,000 sun
-                except (ValueError, TypeError):
-                    trx_balance = 0
-                
-                # 获取USDT余额（TRC20）
-                usdt_balance = 0
-                trc20_tokens = account_data.get('trc20', [])
-                for token in trc20_tokens:
-                    # USDT合约地址: TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
-                    if 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t' in str(token):
-                        token_value = token.get(list(token.keys())[0], '0')
-                        try:
-                            usdt_balance = int(token_value) / 1_000_000  # USDT也是6位小数
-                        except (ValueError, TypeError):
-                            usdt_balance = 0
-                        break
-                
-                # 获取最近交易（简化版）
-                recent_txs = []
-                try:
-                    tx_url = f"{api_url}/v1/accounts/{address}/transactions"
-                    tx_response = await client.get(tx_url, headers=headers, params={'limit': 5})
-                    if tx_response.status_code == 200:
-                        tx_data = tx_response.json()
-                        transactions = tx_data.get('data', [])
-                        
-                        for tx in transactions[:5]:
-                            # 简化交易信息
-                            tx_info = {
-                                'direction': '转入' if tx.get('to_address') == address else '转出',
-                                'amount': '0',
-                                'token': 'TRX',
-                                'hash': tx.get('txID', '')[:10],
-                                'time': tx.get('block_timestamp', '')
-                            }
-                            recent_txs.append(tx_info)
-                except Exception as tx_error:
-                    logger.warning(f"获取交易历史失败: {tx_error}")
-                
-                result = {
-                    'trx_balance': f"{trx_balance:.2f}",
-                    'usdt_balance': f"{usdt_balance:.2f}",
-                    'recent_txs': recent_txs
-                }
-                
-                logger.info(f"成功获取地址信息: TRX={result['trx_balance']}, USDT={result['usdt_balance']}, 交易数={len(recent_txs)}")
-                return result
-        
-        except httpx.TimeoutException as e:
-            logger.error(f"API请求超时: {e}")
-            return None
-        except httpx.RequestError as e:
-            logger.error(f"API请求错误: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"获取地址信息失败: {e}", exc_info=True)
-            return None
+    # API 调用已迁移到 src/clients/tron.py (TronAPIClient)

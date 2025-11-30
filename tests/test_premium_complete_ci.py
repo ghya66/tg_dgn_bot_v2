@@ -68,7 +68,7 @@ class CompletePremiumCITestSuite:
         """测试用户验证服务"""
         print("\n[2/7] 测试用户验证服务...")
         try:
-            from src.premium.user_verification import UserVerificationService
+            from src.modules.premium.user_verification import UserVerificationService
             from telegram import User
             
             # 创建测试数据库
@@ -77,8 +77,8 @@ class CompletePremiumCITestSuite:
             SessionLocal = sessionmaker(bind=engine)
             test_db = SessionLocal()
             
-            with patch('src.premium.user_verification.get_db') as mock_get_db:
-                with patch('src.premium.user_verification.close_db') as mock_close_db:
+            with patch('src.modules.premium.user_verification.get_db') as mock_get_db:
+                with patch('src.modules.premium.user_verification.close_db') as mock_close_db:
                     mock_get_db.return_value = test_db
                     mock_close_db.return_value = None
                     
@@ -105,7 +105,7 @@ class CompletePremiumCITestSuite:
         """测试收件人解析器"""
         print("\n[3/7] 测试收件人解析器...")
         try:
-            from src.premium.recipient_parser import RecipientParser
+            from src.modules.premium.recipient_parser import RecipientParser
             
             # 测试解析
             test_cases = [
@@ -135,7 +135,7 @@ class CompletePremiumCITestSuite:
         """测试安全服务"""
         print("\n[4/7] 测试安全服务...")
         try:
-            from src.premium.security import PremiumSecurityService
+            from src.modules.premium.security import PremiumSecurityService
             
             # 创建测试数据库
             engine = create_engine("sqlite:///:memory:")
@@ -143,8 +143,8 @@ class CompletePremiumCITestSuite:
             SessionLocal = sessionmaker(bind=engine)
             test_db = SessionLocal()
             
-            with patch('src.premium.security.get_db') as mock_get_db:
-                with patch('src.premium.security.close_db') as mock_close_db:
+            with patch('src.modules.premium.security.get_db') as mock_get_db:
+                with patch('src.modules.premium.security.close_db') as mock_close_db:
                     mock_get_db.return_value = test_db
                     mock_close_db.return_value = None
                     
@@ -174,7 +174,7 @@ class CompletePremiumCITestSuite:
         """测试Premium Handler V2"""
         print("\n[5/7] 测试Premium Handler V2...")
         try:
-            from src.premium.handler_v2 import PremiumHandlerV2
+            from src.modules.premium.handler_v2 import PremiumHandlerV2
             
             handler = PremiumHandlerV2(
                 order_manager=MagicMock(),
@@ -190,9 +190,9 @@ class CompletePremiumCITestSuite:
             
             # 测试套餐配置
             self.record_test("套餐配置", 
-                           handler.PACKAGES[3] == 16.0 and 
+                           handler.PACKAGES[3] == 17.0 and 
                            handler.PACKAGES[6] == 25.0 and 
-                           handler.PACKAGES[12] == 35.0)
+                           handler.PACKAGES[12] == 40.0)
             
         except Exception as e:
             self.record_test("Premium Handler V2", False, str(e))
@@ -225,7 +225,7 @@ class CompletePremiumCITestSuite:
                 buyer_id=123456,
                 recipient_type='self',
                 premium_months=3,
-                amount_usdt=16.0,
+                amount_usdt=17.0,
                 status='PENDING',
                 expires_at=datetime.now() + timedelta(hours=1)
             )
@@ -246,7 +246,7 @@ class CompletePremiumCITestSuite:
         """测试错误处理"""
         print("\n[7/7] 测试错误处理...")
         try:
-            from src.premium.recipient_parser import RecipientParser
+            from src.modules.premium.recipient_parser import RecipientParser
             
             # 测试无效输入
             # 测试无效输入 - 这些应该返回空列表

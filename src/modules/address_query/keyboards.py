@@ -19,7 +19,7 @@ class AddressQueryKeyboards:
     def back_to_main_keyboard() -> InlineKeyboardMarkup:
         """返回主菜单键盘"""
         keyboard = [[
-            InlineKeyboardButton("🔙 返回主菜单", callback_data="addrq_back_to_main")
+            InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")
         ]]
         return InlineKeyboardMarkup(keyboard)
     
@@ -32,18 +32,8 @@ class AddressQueryKeyboards:
                 InlineKeyboardButton("🔍 查询转账记录", url=txs_url),
             ],
             [
-                InlineKeyboardButton("🔙 返回主菜单", callback_data="addrq_back_to_main")
+                InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")
             ]
         ]
         return InlineKeyboardMarkup(keyboard)
     
-    @staticmethod
-    def retry_keyboard() -> InlineKeyboardMarkup:
-        """重试键盘"""
-        keyboard = [
-            [
-                InlineKeyboardButton("🔄 重新查询", callback_data="addrq_retry"),
-                InlineKeyboardButton("🔙 返回主菜单", callback_data="addrq_back_to_main"),
-            ]
-        ]
-        return InlineKeyboardMarkup(keyboard)

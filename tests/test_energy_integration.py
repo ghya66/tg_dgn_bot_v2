@@ -12,7 +12,7 @@ ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
 from src.config import settings
-from src.energy.client import EnergyAPIClient, EnergyAPIError
+from src.modules.energy.client import EnergyAPIClient, EnergyAPIError
 from src.database import init_db, get_db, close_db, EnergyOrder
 
 

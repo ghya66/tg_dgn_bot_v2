@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 from datetime import datetime, timedelta
 import uuid
 
-from src.premium.handler_v2 import (
+from src.modules.premium.handler_v2 import (
     PremiumHandlerV2, 
     SELECTING_TARGET,
     SELECTING_PACKAGE,
@@ -20,7 +20,7 @@ from src.premium.handler_v2 import (
 )
 from src.payments.order import OrderManager
 from src.payments.suffix_manager import SuffixManager
-from src.premium.delivery import PremiumDeliveryService
+from src.modules.premium.delivery import PremiumDeliveryService
 from src.models import OrderType
 
 
@@ -202,8 +202,8 @@ class TestPremiumSelfPurchase:
             assert "处理请求时出现错误" in error_call[0][0]
             assert "Test error" in error_call[0][0]
     
-    @patch('src.premium.handler_v2.get_db')
-    @patch('src.premium.handler_v2.close_db')
+    @patch('src.modules.premium.handler_v2.get_db')
+    @patch('src.modules.premium.handler_v2.close_db')
     async def test_package_selected_for_self(
         self, 
         mock_close_db, 
@@ -237,7 +237,7 @@ class TestPremiumSelfPurchase:
         
         # 验证订单创建
         assert mock_context.user_data['premium_months'] == 3
-        assert mock_context.user_data['base_amount'] == 16.0
+        assert mock_context.user_data['base_amount'] == 17.0
         assert 'order_id' in mock_context.user_data
         
         # 验证消息更新
@@ -309,7 +309,7 @@ class TestPremiumGiftPurchase:
             assert "处理请求时出现错误" in error_call[0][0]
             assert "Network error" in error_call[0][0]
     
-    @patch('src.premium.handler_v2.RecipientParser')
+    @patch('src.modules.premium.handler_v2.RecipientParser')
     async def test_username_entered_valid(
         self, 
         mock_parser, 

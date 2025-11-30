@@ -9,9 +9,9 @@ from decimal import Decimal
 from datetime import datetime
 import logging
 
-from ..legacy.trx_exchange.config import TRXExchangeConfig
-from ..legacy.trx_exchange.rate_manager import RateManager
-from ..legacy.trx_exchange.trx_sender import TRXSender
+from ..modules.trx_exchange.config import TRXExchangeConfig
+from ..modules.trx_exchange.rate_manager import RateManager
+from ..modules.trx_exchange.trx_sender import TRXSender
 from ..database import SessionLocal
 from ..trx_exchange.models import TRXExchangeOrder
 

@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     
     # 地址查询限频（分钟）
     address_query_rate_limit_minutes: int = 1
+    
+    # HTTP 超时配置（秒）
+    api_timeout_default_secs: int = 10  # 通用 API 默认超时
+    okx_timeout_secs: int = 10  # OKX 汇率接口超时
+    tron_timeout_secs: int = 15  # Tron/区块链接口超时
 
     # USDT 汇率看板配置
     usdt_rates_cache_ttl: int = 3600  # Redis 缓存 TTL（秒）

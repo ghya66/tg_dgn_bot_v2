@@ -25,6 +25,7 @@ from src.core.state_manager import ModuleStateManager
 from src.common.navigation_manager import NavigationManager
 from src.common.conversation_wrapper import SafeConversationHandler
 from src.common.settings_service import get_order_timeout_minutes
+from src.common.error_collector import collect_error
 from src.models import OrderType
 
 from .states import *
@@ -40,9 +41,9 @@ class PremiumModule(BaseModule):
     
     # 套餐配置 {months: price_usdt}
     PACKAGES = {
-        3: 16.0,
+        3: 17.0,
         6: 25.0,
-        12: 35.0
+        12: 40.0
     }
     
     def __init__(
@@ -74,7 +75,7 @@ class PremiumModule(BaseModule):
         self.state_manager = ModuleStateManager()
         
         # 验证服务（保持兼容）
-        from src.premium.user_verification import get_user_verification_service
+        from .user_verification import get_user_verification_service
         self.verification_service = get_user_verification_service(bot_username)
         
         # 收件人解析器（保持兼容）
@@ -120,10 +121,8 @@ class PremiumModule(BaseModule):
                 ],
             },
             fallbacks=[
-                MessageHandler(
-                    filters.Regex(r"^🔍 地址查询|👤 个人中心|⚡ 能量兑换|🔄 TRX 兑换|👨‍💼 联系客服|💵 实时U价|🎁 免费克隆$"), 
-                    self.cancel_silent
-                ),
+                # SafeConversationHandler 自动添加导航和 /cancel 处理
+                # 不再匹配其他模块的入口按钮，避免冲突
             ],
             allow_reentry=True,
             name="premium_standard"
@@ -207,6 +206,12 @@ class PremiumModule(BaseModule):
             
         except Exception as e:
             logger.error(f"Error in select_self: {e}", exc_info=True)
+            collect_error(
+                "premium_select_self",
+                str(e),
+                context={"user_id": update.effective_user.id},
+                exception=e
+            )
             error_text = PremiumMessages.ERROR_GENERAL.format(
                 error=self.formatter.escape_html(str(e))
             )
@@ -238,6 +243,12 @@ class PremiumModule(BaseModule):
             
         except Exception as e:
             logger.error(f"Error in select_other: {e}", exc_info=True)
+            collect_error(
+                "premium_select_other",
+                str(e),
+                context={"user_id": update.effective_user.id},
+                exception=e
+            )
             error_text = PremiumMessages.ERROR_GENERAL.format(
                 error=self.formatter.escape_html(str(e))
             )
@@ -259,7 +270,7 @@ class PremiumModule(BaseModule):
             username = text
         
         # 验证格式
-        from src.premium.recipient_parser import RecipientParser
+        from .recipient_parser import RecipientParser
         if not RecipientParser.validate_username(username):
             await update.message.reply_text(
                 PremiumMessages.INVALID_USERNAME,

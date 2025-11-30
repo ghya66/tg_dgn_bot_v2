@@ -69,8 +69,8 @@ def test_db():
     """提供SQLite内存数据库用于测试"""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
-    from src.trx_exchange.models import Base as TRXBase
-    from src.trx_exchange.rate_manager import Base as RateBase
+    from src.modules.trx_exchange.models import Base as TRXBase
+    from src.modules.trx_exchange.rate_manager import Base as RateBase
     
     # 创建内存数据库
     engine = create_engine("sqlite:///:memory:")
@@ -144,7 +144,7 @@ def register_v2_modules(app):
     from src.modules.address_query.handler import AddressQueryModule
     from src.payments.order import order_manager
     from src.payments.suffix_manager import suffix_manager
-    from src.premium.delivery import PremiumDeliveryService
+    from src.modules.premium.delivery import PremiumDeliveryService
     
     registry = get_registry()
     

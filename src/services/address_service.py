@@ -7,8 +7,8 @@ from typing import Optional, Dict, Tuple
 from datetime import datetime, timedelta
 import logging
 
-from ..legacy.address_query.validator import AddressValidator
-from ..legacy.address_query.explorer import explorer_links, get_tronscan_link
+from ..modules.address_query.validator import AddressValidator
+from ..modules.address_query.explorer import explorer_links, get_tronscan_link
 from ..database import SessionLocal, AddressQueryLog
 from ..common.settings_service import get_address_cooldown_minutes
 

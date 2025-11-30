@@ -78,7 +78,7 @@ class TestMainMenuStandard:
         """测试模块属性"""
         assert menu_module.module_name == "main_menu"
         handlers = menu_module.get_handlers()
-        assert len(handlers) == 3  # start命令 + 返回主菜单回调 + 免费克隆回调
+        assert len(handlers) == 8  # start命令 + 返回主菜单 + 免费克隆 + 联系客服(callback) + 订单 + 实时汇率 + 免费克隆消息 + 联系客服(reply keyboard)
     
     @pytest.mark.asyncio
     @patch('src.config.settings')

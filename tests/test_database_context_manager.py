@@ -171,7 +171,7 @@ class TestModulesUsingContextManager:
     @pytest.mark.asyncio
     async def test_user_verification_uses_context_manager(self):
         """测试UserVerificationService使用上下文管理器"""
-        from src.premium.user_verification import UserVerificationService
+        from src.modules.premium.user_verification import UserVerificationService
         
         service = UserVerificationService()
         
@@ -186,7 +186,7 @@ class TestModulesUsingContextManager:
     @pytest.mark.asyncio
     async def test_premium_security_uses_context_manager(self):
         """测试PremiumSecurityService使用上下文管理器"""
-        from src.premium.security import PremiumSecurityService
+        from src.modules.premium.security import PremiumSecurityService
         
         service = PremiumSecurityService()
         

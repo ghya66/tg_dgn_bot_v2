@@ -120,19 +120,19 @@ python -m src.bot
 - `BOT_TOKEN`
 - `USDT_TRC20_RECEIVE_ADDR`
 - `WEBHOOK_SECRET`
+- `BOT_OWNER_ID`（用于接收发货结果通知、访问管理命令）
+- Bot 账号内已充值足够的 Telegram Stars（在客户端内完成充值）
 
 **用户流程**：
 1. 点击"飞机会员"
 2. 选择套餐（3/6/12 个月）
 3. 输入收件人（@username）
 4. 转账 USDT（精确到 3 位小数）
-5. 自动交付到收件人账户
+5. Bot 使用 Stars 自动为收件人开通 Telegram Premium 会员
 
 **测试建议**：
-- 先用小金额测试（3个月套餐，约 $10）
+- 先用小金额测试（3 个月套餐，价格 17 USDT）
 - 确认 TRC20 回调正常工作
-
----
 
 ### 功能 2: 余额管理 ✅ 开箱即用
 

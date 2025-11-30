@@ -1,22 +1,36 @@
 """
-测试 Premium 交付服务
+测试 Premium 交付服务 - 自动发货模式
 """
 import pytest
-from unittest.mock import AsyncMock, MagicMock
-from telegram import Bot
+from unittest.mock import AsyncMock, MagicMock, patch
+from telegram import Bot, Chat
 from telegram.error import TelegramError
-from src.premium.delivery import PremiumDeliveryService, DeliveryResult
-from src.models import Order, OrderType, OrderStatus
+from src.modules.premium.delivery import PremiumDeliveryService
 from src.payments.order import order_manager
-from datetime import datetime, timedelta
 
 
 @pytest.fixture
 def mock_bot():
     """创建模拟 Bot"""
     bot = AsyncMock(spec=Bot)
-    bot.send_gift = AsyncMock()
-    bot.get_star_transactions = AsyncMock(return_value=[])
+    
+    # 模拟 Stars 交易记录
+    mock_transactions = MagicMock()
+    mock_transactions.transactions = []
+    bot.get_star_transactions = AsyncMock(return_value=mock_transactions)
+    
+    # 模拟 get_chat
+    mock_chat = MagicMock(spec=Chat)
+    mock_chat.id = 123456
+    mock_chat.first_name = "Alice"
+    bot.get_chat = AsyncMock(return_value=mock_chat)
+    
+    # 模拟 gift_premium_subscription
+    bot.gift_premium_subscription = AsyncMock()
+    
+    # 模拟 send_message
+    bot.send_message = AsyncMock()
+    
     return bot
 
 
@@ -26,145 +40,116 @@ def delivery_service(mock_bot):
     return PremiumDeliveryService(mock_bot, order_manager)
 
 
-@pytest.fixture
-def sample_order():
-    """创建示例订单"""
-    return Order(
-        order_id="test-order-123",
-        base_amount=10.0,
-        unique_suffix=123,
-        total_amount=10.123,
-        user_id=123456,
-        order_type=OrderType.PREMIUM,
-        premium_months=3,
-        recipients=["alice", "bob", "charlie"],
-        status=OrderStatus.PAID,
-        expires_at=datetime.now() + timedelta(minutes=30)
-    )
+@pytest.mark.asyncio
+async def test_stars_price_config(delivery_service):
+    """测试 Stars 价格配置"""
+    assert delivery_service.STARS_PRICE[3] == 1000
+    assert delivery_service.STARS_PRICE[6] == 1750
+    assert delivery_service.STARS_PRICE[12] == 3000
 
 
 @pytest.mark.asyncio
-async def test_delivery_result_creation():
-    """测试交付结果创建"""
-    result = DeliveryResult(
-        username="alice",
-        success=True,
-        user_id=123456
-    )
-    
-    assert result.username == "alice"
-    assert result.success is True
-    assert result.user_id == 123456
-    assert result.error is None
-
-
-@pytest.mark.asyncio
-async def test_delivery_result_with_error():
-    """测试带错误的交付结果"""
-    result = DeliveryResult(
-        username="bob",
-        success=False,
-        error="User not found"
-    )
-    
-    assert result.username == "bob"
-    assert result.success is False
-    assert result.error == "User not found"
-
-
-@pytest.mark.asyncio
-async def test_check_star_balance(delivery_service, mock_bot):
-    """测试检查 XTR 余额"""
-    balance = await delivery_service.check_star_balance()
-    
-    # 目前返回 0（占位实现）
+async def test_check_stars_balance_empty(delivery_service, mock_bot):
+    """测试检查 Stars 余额（空交易）"""
+    balance = await delivery_service.check_stars_balance()
     assert balance == 0
-    mock_bot.get_star_transactions.assert_called_once()
+    mock_bot.get_star_transactions.assert_called_once_with(limit=100)
 
 
 @pytest.mark.asyncio
-async def test_get_gift_id(delivery_service):
-    """测试礼物 ID 映射"""
-    assert delivery_service._get_gift_id(3) == "premium_3_months"
-    assert delivery_service._get_gift_id(6) == "premium_6_months"
-    assert delivery_service._get_gift_id(12) == "premium_12_months"
+async def test_check_stars_balance_with_transactions(delivery_service, mock_bot):
+    """测试检查 Stars 余额（有交易）"""
+    # 模拟交易记录
+    mock_tx1 = MagicMock()
+    mock_tx1.source = True  # 收入
+    mock_tx1.receiver = None
+    mock_tx1.amount = 500
     
-    # 无效月数应该返回默认值
-    assert delivery_service._get_gift_id(99) == "premium_3_months"
+    mock_tx2 = MagicMock()
+    mock_tx2.source = None
+    mock_tx2.receiver = True  # 支出
+    mock_tx2.amount = 200
+    
+    mock_transactions = MagicMock()
+    mock_transactions.transactions = [mock_tx1, mock_tx2]
+    mock_bot.get_star_transactions = AsyncMock(return_value=mock_transactions)
+    
+    balance = await delivery_service.check_stars_balance()
+    assert balance == 300  # 500 - 200
 
 
 @pytest.mark.asyncio
-async def test_determine_status(delivery_service):
-    """测试状态判断"""
-    # 全部失败
-    assert delivery_service._determine_status(0, 3) == OrderStatus.PAID
-    
-    # 全部成功
-    assert delivery_service._determine_status(3, 3) == OrderStatus.DELIVERED
-    
-    # 部分成功
-    assert delivery_service._determine_status(2, 3) == OrderStatus.PARTIAL
+async def test_resolve_user_id_success(delivery_service, mock_bot):
+    """测试解析用户名成功"""
+    user_id = await delivery_service._resolve_user_id("alice")
+    assert user_id == 123456
+    mock_bot.get_chat.assert_called_once_with("@alice")
 
 
 @pytest.mark.asyncio
-async def test_deliver_premium_invalid_order_type(delivery_service):
-    """测试无效订单类型"""
-    order = Order(
-        order_id="test-123",
-        base_amount=10.0,
-        unique_suffix=123,
-        total_amount=10.123,
-        user_id=123456,
-        order_type=OrderType.OTHER,  # 非 Premium 类型
-        expires_at=datetime.now() + timedelta(minutes=30)
-    )
+async def test_resolve_user_id_not_found(delivery_service, mock_bot):
+    """测试解析用户名失败"""
+    mock_bot.get_chat = AsyncMock(side_effect=TelegramError("User not found"))
     
-    with pytest.raises(ValueError, match="Order type must be 'premium'"):
-        await delivery_service.deliver_premium(order)
-
-
-@pytest.mark.asyncio
-async def test_deliver_premium_missing_recipients(delivery_service):
-    """测试缺少收件人"""
-    order = Order(
-        order_id="test-123",
-        base_amount=10.0,
-        unique_suffix=123,
-        total_amount=10.123,
-        user_id=123456,
-        order_type=OrderType.PREMIUM,
-        premium_months=3,
-        recipients=None,  # 缺少收件人
-        expires_at=datetime.now() + timedelta(minutes=30)
-    )
-    
-    with pytest.raises(ValueError, match="Invalid premium order"):
-        await delivery_service.deliver_premium(order)
-
-
-@pytest.mark.asyncio
-async def test_resolve_username_not_found(delivery_service):
-    """测试解析用户名（未找到）"""
-    # 当前实现返回 None（占位）
-    user_id = await delivery_service._resolve_username("alice")
+    user_id = await delivery_service._resolve_user_id("unknown_user")
     assert user_id is None
 
 
-@pytest.mark.redis  # 标记为需要 Redis 的集成测试
-class TestPremiumDeliveryIntegration:
-    """Premium 交付集成测试"""
+@pytest.mark.asyncio
+async def test_deliver_premium_no_recipient_id(delivery_service, mock_bot):
+    """测试发货时无 recipient_id，需要解析"""
+    # 模拟足够的余额
+    mock_tx = MagicMock()
+    mock_tx.source = True
+    mock_tx.receiver = None
+    mock_tx.amount = 2000
+    mock_transactions = MagicMock()
+    mock_transactions.transactions = [mock_tx]
+    mock_bot.get_star_transactions = AsyncMock(return_value=mock_transactions)
     
-    @pytest.mark.asyncio
-    async def test_full_delivery_flow(self, delivery_service, sample_order, mock_bot):
-        """测试完整交付流程"""
-        # 模拟所有用户未绑定（当前实现）
-        results = await delivery_service.deliver_premium(sample_order)
+    # 使用 patch 模拟数据库操作
+    with patch('src.modules.premium.delivery.get_db') as mock_get_db, \
+         patch('src.modules.premium.delivery.close_db'):
+        mock_db = MagicMock()
+        mock_order = MagicMock()
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_order
+        mock_get_db.return_value = mock_db
         
-        # 所有收件人都应该失败（因为未实现绑定功能）
-        assert len(results) == 3
-        for username, result in results.items():
-            assert result.success is False
-            assert result.error == "User not found or not bound"
+        result = await delivery_service.deliver_premium(
+            order_id="test-order-123",
+            buyer_id=999,
+            recipient_username="alice",
+            recipient_id=None,  # 无 ID，需要解析
+            premium_months=3
+        )
         
-        # Bot 不应该被调用（因为没有成功解析用户）
-        mock_bot.send_gift.assert_not_called()
+        assert result["success"] is True
+        assert result["recipient_id"] == 123456
+        mock_bot.gift_premium_subscription.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_deliver_premium_insufficient_balance(delivery_service, mock_bot):
+    """测试发货时余额不足"""
+    # 模拟余额不足
+    mock_transactions = MagicMock()
+    mock_transactions.transactions = []
+    mock_bot.get_star_transactions = AsyncMock(return_value=mock_transactions)
+    
+    with patch('src.modules.premium.delivery.get_db') as mock_get_db, \
+         patch('src.modules.premium.delivery.close_db'):
+        mock_db = MagicMock()
+        mock_order = MagicMock()
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_order
+        mock_get_db.return_value = mock_db
+        
+        result = await delivery_service.deliver_premium(
+            order_id="test-order-123",
+            buyer_id=999,
+            recipient_username="alice",
+            recipient_id=123456,
+            premium_months=3
+        )
+        
+        assert result["success"] is False
+        assert "余额不足" in result["message"]

@@ -21,17 +21,10 @@ from src.modules.menu.handler import MainMenuModule
 from src.modules.energy.handler import EnergyModule
 from src.modules.address_query.handler import AddressQueryModule
 
-# 导入旧模块（逐步迁移）
-from src.wallet.profile_handler import ProfileHandler
+# 导入核心服务
 from src.wallet.wallet_manager import WalletManager
-from src.address_query.handler import AddressQueryHandler
-from src.energy.handler_direct import create_energy_direct_handler
-from src.trx_exchange.handler import TRXExchangeHandler
 from src.payments.order import order_manager
 from src.payments.suffix_manager import suffix_manager
-from src.health import health_command
-from src.bot_admin import admin_handler
-from src.orders.query_handler import get_orders_handler
 from src.tasks.order_expiry import order_expiry_task
 from src.rates.jobs import refresh_usdt_rates_job
 
@@ -123,7 +116,7 @@ class TelegramBotV2:
         )
         
         # 注册Premium模块
-        from src.premium.delivery import PremiumDeliveryService
+        from src.modules.premium.delivery import PremiumDeliveryService
         
         delivery_service = PremiumDeliveryService(
             bot=self.app.bot,
@@ -165,52 +158,120 @@ class TelegramBotV2:
             metadata={"description": "地址查询功能"}
         )
         
+        # 注册个人中心模块 - 标准化版本
+        from src.modules.profile.handler import ProfileModule
+        profile_module = ProfileModule()
+        self.registry.register(
+            profile_module,
+            priority=5,
+            enabled=True,
+            metadata={"description": "个人中心和钱包"}
+        )
+        
+        # 注册TRX兑换模块 - 标准化版本
+        from src.modules.trx_exchange.handler import TRXExchangeModule
+        trx_module = TRXExchangeModule()
+        self.registry.register(
+            trx_module,
+            priority=6,
+            enabled=True,
+            metadata={"description": "TRX闪兑"}
+        )
+        
+        # 注册管理员模块 - 标准化版本（包装现有AdminHandler）
+        from src.modules.admin.handler import AdminModule
+        admin_module = AdminModule()
+        self.registry.register(
+            admin_module,
+            priority=10,
+            enabled=True,
+            metadata={"description": "管理员面板"}
+        )
+        
+        # 注册订单查询模块 - 标准化版本
+        from src.modules.orders.handler import OrdersModule
+        orders_module = OrdersModule()
+        self.registry.register(
+            orders_module,
+            priority=11,
+            enabled=True,
+            metadata={"description": "订单查询"}
+        )
+        
+        # 注册健康检查模块 - 标准化版本
+        from src.modules.health.handler import HealthModule
+        health_module = HealthModule()
+        self.registry.register(
+            health_module,
+            priority=1,
+            enabled=True,
+            metadata={"description": "健康检查"}
+        )
+        
+        # 注册帮助模块 - 标准化版本
+        from src.modules.help.handler import HelpModule
+        help_module = HelpModule()
+        self.registry.register(
+            help_module,
+            priority=12,
+            enabled=True,
+            metadata={"description": "帮助中心"}
+        )
+        
         logger.info(f"✅ 注册了 {len(self.registry.list_modules())} 个标准化模块")
     
     async def _register_legacy_modules(self):
-        """注册旧模块（向后兼容）"""
-        logger.info("📦 注册兼容性模块...")
-        
-        # 健康检查（管理员命令）
-        from telegram.ext import CommandHandler
-        self.app.add_handler(CommandHandler("health", health_command), group=1)
-        
-        # 个人中心
-        from telegram.ext import CallbackQueryHandler
-        self.app.add_handler(
-            CallbackQueryHandler(
-                ProfileHandler.profile_command_callback,
-                pattern=r'^menu_profile$'
-            ), 
-            group=2
-        )
-        
-        # 地址查询 - 已迁移到标准化模块
-        # self.app.add_handler(AddressQueryHandler.get_conversation_handler(), group=2)
-        
-        # 能量兑换 - 已迁移到标准化模块
-        # self.app.add_handler(create_energy_direct_handler(), group=2)
-        
-        # TRX兑换
-        trx_exchange_handler = TRXExchangeHandler()
-        self.app.add_handler(trx_exchange_handler.get_handlers(), group=2)
-        
-        # 管理员功能
-        self.app.add_handler(admin_handler.get_conversation_handler(), group=10)
-        self.app.add_handler(get_orders_handler(), group=10)
-        
-        logger.info("✅ 兼容性模块注册完成")
+        """注册旧模块（向后兼容）- 所有模块已迁移完成"""
+        # 所有模块已迁移到标准化架构，此方法保留用于向后兼容
+        pass
     
     async def _bootstrap_application(self):
         """启动应用"""
         # 初始化所有标准化模块
         self.registry.initialize_all(self.app)
         
+        # 注册全局错误处理器
+        self.app.add_error_handler(self._global_error_handler)
+        logger.info("✅ 全局错误处理器已注册")
+        
+        # 初始化全局 HTTP 客户端（连接池复用）
+        from src.common.http_client import get_async_client
+        await get_async_client()
+        logger.info("✅ 全局 HTTP 客户端已初始化")
+        
         # 设置Bot命令菜单
         await self._setup_bot_commands()
         
         # 初始化定时任务
         await self._init_scheduler()
+    
+    async def _global_error_handler(self, update: object, context) -> None:
+        """
+        全局异常处理器
+        捕获所有未处理的异常，防止Bot崩溃
+        """
+        import traceback
+        
+        # 记录详细错误日志
+        logger.error(f"Bot 处理异常: {context.error}")
+        logger.error(f"异常详情:\n{traceback.format_exc()}")
+        
+        # 尝试通知用户
+        try:
+            if update and hasattr(update, 'effective_user') and update.effective_user:
+                user_id = update.effective_user.id
+                error_message = (
+                    "❌ <b>发生错误</b>\n\n"
+                    "抱歉，处理您的请求时出现问题。\n"
+                    "请稍后重试或联系客服。"
+                )
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=error_message,
+                    parse_mode="HTML"
+                )
+        except Exception as notify_error:
+            logger.warning(f"通知用户错误失败: {notify_error}")
     
     async def _setup_bot_commands(self):
         """设置Bot命令菜单"""
@@ -249,6 +310,9 @@ class TelegramBotV2:
     async def _init_scheduler(self):
         """初始化定时任务"""
         self.scheduler = AsyncIOScheduler(timezone="UTC")
+        
+        # 绑定 Bot 实例到订单过期任务（用于发送通知）
+        order_expiry_task.set_bot(self.application.bot)
         
         # 订单过期检查（每分钟）
         self.scheduler.add_job(
@@ -356,6 +420,10 @@ class TelegramBotV2:
         # 断开Redis
         await order_manager.disconnect()
         await suffix_manager.disconnect()
+        
+        # 关闭全局 HTTP 客户端
+        from src.common.http_client import close_async_client
+        await close_async_client()
         
         logger.info("✅ Bot V2 已停止")
 

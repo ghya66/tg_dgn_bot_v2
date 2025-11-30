@@ -6,6 +6,7 @@ TRC20 Webhook 回调处理器
 """
 import logging
 from typing import Dict, Any, Optional
+from datetime import datetime
 import time
 import re
 
@@ -175,8 +176,34 @@ class TRC20Handler:
             delivery_result = None
             if order.order_type == OrderType.PREMIUM and self.delivery_service:
                 try:
-                    delivery_result = await self.delivery_service.deliver_premium(order)
-                    logger.info(f"Premium delivery initiated for order {order.order_id}")
+                    # 获取 Premium 订单详情
+                    from src.database import get_db, close_db, PremiumOrder
+                    db = get_db()
+                    try:
+                        premium_order = db.query(PremiumOrder).filter(
+                            PremiumOrder.order_id == order.order_id
+                        ).first()
+                        
+                        if premium_order:
+                            # 更新状态为已支付
+                            premium_order.status = 'PAID'
+                            premium_order.paid_at = datetime.now()
+                            premium_order.tx_hash = callback.tx_hash
+                            db.commit()
+                            
+                            # 自动发货
+                            delivery_result = await self.delivery_service.deliver_premium(
+                                order_id=order.order_id,
+                                buyer_id=premium_order.buyer_id,
+                                recipient_username=premium_order.recipient_username,
+                                recipient_id=premium_order.recipient_id,
+                                premium_months=premium_order.premium_months
+                            )
+                            logger.info(f"Premium delivery result for order {order.order_id}: {delivery_result}")
+                        else:
+                            logger.error(f"Premium order not found: {order.order_id}")
+                    finally:
+                        close_db(db)
                 except Exception as e:
                     logger.error(f"Failed to deliver premium for order {order.order_id}: {e}")
             

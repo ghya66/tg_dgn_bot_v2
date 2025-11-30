@@ -138,7 +138,7 @@ GET /api/premium/packages
   "data": [
     {
       "months": 3,
-      "price": 16.0,
+      "price": 17.0,
       "currency": "USDT",
       "discount": 0
     },
@@ -147,6 +147,12 @@ GET /api/premium/packages
       "price": 25.0,
       "currency": "USDT",
       "discount": 10
+    },
+    {
+      "months": 12,
+      "price": 40.0,
+      "currency": "USDT",
+      "discount": 20
     }
   ]
 }
@@ -165,7 +171,7 @@ POST /api/orders
 ```json
 {
   "user_id": 123456,
-  "base_amount": 10.0,
+  "base_amount": 17.0,
   "order_type": "premium",
   "recipient_id": 654321,
   "months": 3
@@ -297,6 +303,113 @@ POST /api/energy/calculate
 ```json
 {
   "energy_amount": 65000
+}
+```
+
+#### 获取能量配置
+```http
+GET /api/energy/config
+```
+
+**响应示例**：
+```json
+{
+  "success": true,
+  "data": {
+    "rent_address": "T...",
+    "package_address": "T...",
+    "flash_address": "T...",
+    "api_configured": true
+  }
+}
+```
+
+#### 查询实时能量价格
+```http
+GET /api/energy/prices
+```
+
+**响应示例**：
+```json
+{
+  "success": true,
+  "data": {
+    "energy_65k_price": 3.0,
+    "energy_131k_price": 6.0,
+    "package_price": 3.6,
+    "source": "trxno.com"
+  }
+}
+```
+
+#### 查询代理账户信息 🔐
+```http
+GET /api/energy/account
+```
+
+**需要认证**: ✅
+
+**响应示例**：
+```json
+{
+  "success": true,
+  "data": {
+    "username": "your_username",
+    "balance_trx": 1000.0,
+    "balance_usdt": 500.0,
+    "frozen_balance": 0.0
+  }
+}
+```
+
+#### 购买时长能量 🔐
+```http
+POST /api/energy/buy-hourly
+```
+
+**需要认证**: ✅
+
+**请求体**：
+```json
+{
+  "receive_address": "TLyqzVGLV1srkB7dToTAEqgDSfPtXRJZYH",
+  "energy_amount": 65000,
+  "rent_time": 1
+}
+```
+
+#### 购买笔数套餐 🔐
+```http
+POST /api/energy/buy-package
+```
+
+**需要认证**: ✅
+
+**请求体**：
+```json
+{
+  "receive_address": "TLyqzVGLV1srkB7dToTAEqgDSfPtXRJZYH"
+}
+```
+
+#### 查询能量订单 🔐
+```http
+GET /api/energy/orders/{order_id}
+```
+
+**需要认证**: ✅
+
+#### 激活地址 🔐
+```http
+POST /api/energy/activate
+```
+
+**需要认证**: ✅
+
+**请求体**：
+```json
+{
+  "target_address": "TLyqzVGLV1srkB7dToTAEqgDSfPtXRJZYH"
 }
 ```
 
@@ -436,5 +549,5 @@ curl -X POST \
    - 验证所有输入参数
 
 ---
-*最后更新: 2024-11-24*
-*API版本: 2.0.0*
+*最后更新: 2025-11-30*
+*API版本: 2.1.0*

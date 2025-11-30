@@ -12,7 +12,7 @@ from contextlib import contextmanager
 # 添加src到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.premium.security import PremiumSecurityService, PremiumSecurityConfig
+from src.modules.premium.security import PremiumSecurityService, PremiumSecurityConfig
 from src.database import Base, PremiumOrder
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -37,7 +37,7 @@ class TestPremiumSecurity:
         def mock_db_context():
             yield test_db
         
-        with patch('src.premium.security.get_db_context', mock_db_context):
+        with patch('src.modules.premium.security.get_db_context', mock_db_context):
             service = PremiumSecurityService()
             yield service
     
@@ -59,7 +59,7 @@ class TestPremiumSecurity:
                 buyer_id=user_id,
                 recipient_type='self',
                 premium_months=3,
-                amount_usdt=16.0,
+                amount_usdt=17.0,
                 status='PAID',
                 created_at=datetime.now() - timedelta(hours=2, minutes=i*10),  # 2小时前
                 expires_at=datetime.now() + timedelta(hours=1)
@@ -84,7 +84,7 @@ class TestPremiumSecurity:
             buyer_id=user_id,
             recipient_type='self',
             premium_months=3,
-            amount_usdt=16.0,
+            amount_usdt=17.0,
             status='PENDING',
             created_at=datetime.now() - timedelta(seconds=30),  # 30秒前
             expires_at=datetime.now() + timedelta(hours=1)
@@ -131,7 +131,7 @@ class TestPremiumSecurity:
                 recipient_username=recipient_username,
                 recipient_type='other',
                 premium_months=3,
-                amount_usdt=16.0,
+                amount_usdt=17.0,
                 status='DELIVERED',
                 expires_at=datetime.now() + timedelta(hours=1)
             )
@@ -156,7 +156,7 @@ class TestPremiumSecurity:
                 recipient_type='other' if i % 2 == 0 else 'self',
                 recipient_username=f"user_{i}" if i % 2 == 0 else None,
                 premium_months=12,
-                amount_usdt=35.0,
+                amount_usdt=40.0,
                 status='PAID' if i % 3 != 0 else 'CANCELLED',
                 created_at=datetime.now() - timedelta(minutes=i*10),
                 expires_at=datetime.now() + timedelta(hours=1)
@@ -208,9 +208,9 @@ async def test_run_security_ci():
     def mock_db_context():
         yield test_db
     
-    with patch('src.premium.security.get_db_context', mock_db_context):
-        with patch('src.premium.security.get_db', return_value=test_db):
-            with patch('src.premium.security.close_db'):
+    with patch('src.modules.premium.security.get_db_context', mock_db_context):
+        with patch('src.modules.premium.security.get_db', return_value=test_db):
+            with patch('src.modules.premium.security.close_db'):
                 service = PremiumSecurityService()
                 
                 # 测试黑名单功能

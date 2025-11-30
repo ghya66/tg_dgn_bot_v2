@@ -1,7 +1,7 @@
 import asyncio
 import pytest
 
-from src.health import HealthService
+from src.modules.health.service import HealthService
 
 
 class _FakeRedisOK:

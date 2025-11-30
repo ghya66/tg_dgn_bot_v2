@@ -80,7 +80,7 @@ def error_handler(func: Callable) -> Callable:
                 f"错误代码: <code>{func.__name__}_{type(e).__name__}</code>"
             )
             
-            keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]]
+            keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             try:

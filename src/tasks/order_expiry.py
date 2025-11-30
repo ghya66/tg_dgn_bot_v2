@@ -7,7 +7,10 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from telegram import Bot
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -25,7 +28,13 @@ class OrderExpiryTask:
     def __init__(self):
         """初始化任务"""
         self.suffix_manager = SuffixManager()
+        self._bot: Optional["Bot"] = None
         logger.info("订单超时处理任务初始化完成")
+    
+    def set_bot(self, bot: "Bot") -> None:
+        """设置 Bot 实例用于发送通知"""
+        self._bot = bot
+        logger.info("订单超时任务已绑定 Bot 实例")
 
     def check_and_expire_orders(self) -> dict:
         """
@@ -140,6 +149,9 @@ class OrderExpiryTask:
                         
             except Exception as e:
                 logger.error(f"释放后缀失败 (订单: {order_id}): {e}")
+        
+        # 通知用户订单已过期
+        self._notify_user_order_expired(order, stats)
 
     def _should_release_suffix(self, order_type: str) -> bool:
         """
@@ -183,6 +195,54 @@ class OrderExpiryTask:
         except Exception as e:
             logger.error(f"提取后缀失败 (金额: {amount_micro_usdt}): {e}")
             return None
+
+    def _notify_user_order_expired(self, order: Order, stats: dict):
+        """
+        通知用户订单已过期
+        
+        Args:
+            order: 订单对象
+            stats: 统计字典
+        """
+        if not self._bot:
+            logger.debug("未设置 Bot 实例，跳过用户通知")
+            return
+        
+        user_id = order.user_id
+        order_id = order.order_id
+        order_type = order.order_type
+        
+        # 构建通知消息
+        order_type_names = {
+            "premium": "Premium会员",
+            "deposit": "余额充值",
+            "trx_exchange": "TRX兑换",
+            "energy": "能量服务"
+        }
+        type_name = order_type_names.get(order_type, order_type)
+        
+        message = (
+            f"⏰ <b>订单已过期</b>\n\n"
+            f"订单号: <code>{order_id}</code>\n"
+            f"类型: {type_name}\n\n"
+            f"订单因超时未支付已自动取消。\n"
+            f"如需继续，请重新发起。"
+        )
+        
+        try:
+            # 使用 asyncio.run 发送消息
+            asyncio.run(
+                self._bot.send_message(
+                    chat_id=user_id,
+                    text=message,
+                    parse_mode="HTML"
+                )
+            )
+            logger.info(f"已通知用户 {user_id} 订单 {order_id} 过期")
+            stats["notified"] = stats.get("notified", 0) + 1
+        except Exception as e:
+            # 通知失败不影响主流程
+            logger.warning(f"通知用户 {user_id} 失败: {e}")
 
     def run(self):
         """运行任务（由调度器调用）"""

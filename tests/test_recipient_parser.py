@@ -2,7 +2,7 @@
 测试收件人解析器
 """
 import pytest
-from src.premium.recipient_parser import RecipientParser
+from src.modules.premium.recipient_parser import RecipientParser
 
 
 class TestRecipientParser:

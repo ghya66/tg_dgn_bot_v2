@@ -12,7 +12,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.premium.handler_v2 import (
+from src.modules.premium.handler_v2 import (
     PremiumHandlerV2,
     SELECTING_TARGET,
     SELECTING_PACKAGE,
@@ -21,7 +21,7 @@ from src.premium.handler_v2 import (
     VERIFYING_USERNAME,
     CONFIRMING_ORDER
 )
-from src.premium.recipient_parser import RecipientParser
+from src.modules.premium.recipient_parser import RecipientParser
 
 
 class TestPremiumV2StateMachine:

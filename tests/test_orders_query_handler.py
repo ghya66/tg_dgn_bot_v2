@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from src.database import Order
-from src.orders.query_handler import _build_order_detail_text
+from src.modules.orders.query_handler import _build_order_detail_text
 
 
 def _make_order(**overrides) -> Order:

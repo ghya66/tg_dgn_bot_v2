@@ -130,7 +130,7 @@ class TestPremiumValidation:
     @pytest.mark.asyncio
     async def test_recipient_parser(self):
         """测试收件人解析器"""
-        from src.premium.recipient_parser import RecipientParser
+        from src.modules.premium.recipient_parser import RecipientParser
         
         test_cases = [
             # (输入文本, 预期结果) - 用户名至少5字符
@@ -153,7 +153,7 @@ class TestPremiumValidation:
     @pytest.mark.asyncio
     async def test_username_validation(self):
         """测试用户名验证"""
-        from src.premium.recipient_parser import RecipientParser
+        from src.modules.premium.recipient_parser import RecipientParser
         
         valid_usernames = [
             "alice",  # 5字符

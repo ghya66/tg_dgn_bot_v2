@@ -78,17 +78,6 @@ class AdminMenus:
         return InlineKeyboardMarkup(keyboard)
     
     @staticmethod
-    def confirm_action(action_data: str) -> InlineKeyboardMarkup:
-        """确认操作菜单"""
-        keyboard = [
-            [
-                InlineKeyboardButton("✅ 确认", callback_data=f"admin_confirm_{action_data}"),
-                InlineKeyboardButton("❌ 取消", callback_data="admin_main")
-            ]
-        ]
-        return InlineKeyboardMarkup(keyboard)
-    
-    @staticmethod
     def back_to_main() -> InlineKeyboardMarkup:
         """返回主菜单按钮"""
         keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="admin_main")]]

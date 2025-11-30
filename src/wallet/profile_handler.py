@@ -56,7 +56,7 @@ class ProfileHandler:
             [InlineKeyboardButton("💰 余额查询", callback_data="profile_balance")],
             [InlineKeyboardButton("💳 充值 USDT", callback_data="profile_deposit")],
             [InlineKeyboardButton("📝 充值记录", callback_data="profile_history")],
-            [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")],
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -82,7 +82,7 @@ class ProfileHandler:
             [InlineKeyboardButton("💰 余额查询", callback_data="profile_balance")],
             [InlineKeyboardButton("💳 充值 USDT", callback_data="profile_deposit")],
             [InlineKeyboardButton("📝 充值记录", callback_data="profile_history")],
-            [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")],
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 

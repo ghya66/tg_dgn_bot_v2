@@ -28,10 +28,10 @@ Bot V2 采用了全新的标准化模块架构，提供了更好的可维护性�
 │  📦 标准化模块层                                              │
 │  ┌───────────┬───────────┬───────────┬──────────────┐      │
 │  │ Premium   │  Energy   │   TRX     │   Wallet     │      │
-│  │ ✅ 已完成  │ ✅ 已完成  │  📋 计划中 │  📋 计划中    │      │
+│  │ ✅ 已完成  │ ✅ 已完成  │ ✅ 已完成  │  📋 计划中    │      │
 │  ├───────────┼───────────┼───────────┼──────────────┤      │
 │  │ Address   │   Menu    │   Help    │   Admin      │      │
-│  │ ✅ 已完成  │ ✅ 已完成  │  📋 计划中 │  📋 计划中    │      │
+│  │ ✅ 已完成  │ ✅ 已完成  │ ✅ 已完成  │ ✅ 已完成     │      │
 │  └───────────┴───────────┴───────────┴──────────────┘      │
 │                           ↓                                  │
 │  💾 数据层                                                    │
@@ -364,33 +364,7 @@ tail -f logs/api.log
 - 响应时间: `< 1s`
 - 错误率: `< 0.1%`
 
-## Services 层与 Legacy 目录
-
-### Legacy 目录 (`src/legacy/`)
-
-存放 V1 版本的旧版业务逻辑实现，仅用于向后兼容。
-
-**目录结构**:
-```
-src/legacy/
-├── __init__.py
-├── energy/           # 能量服务旧版实现
-│   ├── manager.py    - 能量订单管理器
-│   ├── client.py     - API 客户端
-│   └── models.py     - 数据模型
-├── trx_exchange/     # TRX 兑换旧版实现
-│   ├── config.py     - 兑换配置
-│   ├── rate_manager.py - 汇率管理
-│   └── trx_sender.py - TRX 发送器
-└── address_query/    # 地址查询旧版实现
-    ├── validator.py  - 地址验证
-    └── explorer.py   - 浏览器链接
-```
-
-**使用规则**:
-- 不在 legacy 目录新增业务代码
-- 新代码应使用 services 层
-- 逐步将调用方迁移到 services 层
+## Services 层
 
 ### Services 层 (`src/services/`)
 
@@ -442,10 +416,17 @@ order, error = energy_service.create_order(
 
 ## 更新日志
 
-### v2.1.0 (2025-11-26)
-- ✨ 新增 `src/legacy/` 目录，存放旧版业务逻辑
+### v2.2.0 (2025-11-30)
+- 🗑️ 删除 `src/legacy/` 目录，完成标准化迁移
+- 🗑️ 删除 `src/trx_exchange/` 目录，合并到 modules
+- 🔄 移动 models.py 到 `src/modules/trx_exchange/models.py`
+- 🔧 修复订单查询模块 Markdown 解析问题
+- 🔧 新增订单详情和用户筛选功能
+- 🔧 帮助文档价格动态化（实时读取配置）
 - ✨ 新增 `src/services/` 层，提供业务服务接口
-- 🔄 更新各模块 import，指向 legacy
+
+### v2.1.0 (2025-11-26)
+- 🔄 更新各模块 import，统一使用 modules 路径
 - 📝 更新架构文档
 - 🔧 补充缺失的模块文件（menu/states.py, menu/keyboards.py, address_query/keyboards.py）
 - 🔧 统一回调数据命名（premium_, addrq_ 前缀）

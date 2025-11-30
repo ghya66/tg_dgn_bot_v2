@@ -114,7 +114,7 @@ class TestCompleteNavigationCI:
         category_tests = []
         
         try:
-            from src.premium.handler_v2 import PremiumHandlerV2
+            from src.modules.premium.handler_v2 import PremiumHandlerV2
             
             handler = PremiumHandlerV2(
                 order_manager=Mock(),
