@@ -312,7 +312,7 @@ class TelegramBotV2:
         self.scheduler = AsyncIOScheduler(timezone="UTC")
         
         # 绑定 Bot 实例到订单过期任务（用于发送通知）
-        order_expiry_task.set_bot(self.application.bot)
+        order_expiry_task.set_bot(self.app.bot)
         
         # 订单过期检查（每分钟）
         self.scheduler.add_job(
