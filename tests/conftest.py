@@ -255,9 +255,10 @@ def build_test_app_v2():
         Application: 配置好的测试 Application
     """
     from telegram.ext import Application
-    
+
     # 创建 Application（使用假 token，不会连接网络）
-    app = Application.builder().token("TEST:BOT_TOKEN_FOR_TESTING").build()
+    # 禁用 JobQueue 以避免 weakref 兼容性问题
+    app = Application.builder().token("TEST:BOT_TOKEN_FOR_TESTING").job_queue(None).build()
     
     # 设置 Application 为已初始化状态（绕过初始化检查）
     app._initialized = True
