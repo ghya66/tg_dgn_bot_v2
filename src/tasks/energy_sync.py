@@ -49,7 +49,9 @@ class EnergySyncTask:
             
             async with EnergyAPIClient(
                 username=settings.energy_api_username,
-                password=settings.energy_api_password
+                password=settings.energy_api_password,
+                base_url=settings.energy_api_base_url,
+                backup_url=settings.energy_api_backup_url,
             ) as client:
                 for order in orders:
                     await self._sync_single_order(client, order)

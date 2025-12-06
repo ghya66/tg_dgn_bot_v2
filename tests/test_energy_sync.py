@@ -200,15 +200,58 @@ class TestEnergySyncTask:
 
 class TestGetEnergySyncTask:
     """get_energy_sync_task 测试"""
-    
+
     def test_get_energy_sync_task_singleton(self):
         """测试单例模式"""
         # 重置全局实例
         import src.tasks.energy_sync as module
         module._sync_task = None
-        
+
         task1 = get_energy_sync_task()
         task2 = get_energy_sync_task()
-        
+
         assert task1 is task2
+
+
+class TestEnergySyncURLParams:
+    """测试 EnergyAPIClient 使用正确的 URL 参数"""
+
+    @pytest.mark.asyncio
+    async def test_sync_orders_uses_config_urls(self):
+        """测试 sync_orders 使用配置中的 URL 参数"""
+        from src.config import settings
+
+        task = EnergySyncTask()
+
+        # Mock _get_pending_orders 返回一个订单
+        mock_orders = [{
+            "order_id": "ENERGY_TEST",
+            "api_order_id": "12345",
+            "status": "PROCESSING",
+            "user_id": 10001,
+            "energy_amount": 65000,
+        }]
+
+        with patch.object(task, '_get_pending_orders', return_value=mock_orders):
+            with patch('src.tasks.energy_sync.EnergyAPIClient') as MockClient:
+                # 设置 mock 返回值
+                mock_instance = AsyncMock()
+                mock_instance.query_order.return_value = MagicMock(
+                    data={"status": 1, "hash": "abc123"}
+                )
+                mock_instance.__aenter__.return_value = mock_instance
+                mock_instance.__aexit__.return_value = None
+                MockClient.return_value = mock_instance
+
+                with patch.object(task, '_update_order_status'):
+                    with patch.object(task, '_notify_user', new_callable=AsyncMock):
+                        await task.sync_orders()
+
+                # 验证 EnergyAPIClient 被正确调用，包含 URL 参数
+                MockClient.assert_called_once_with(
+                    username=settings.energy_api_username,
+                    password=settings.energy_api_password,
+                    base_url=settings.energy_api_base_url,
+                    backup_url=settings.energy_api_backup_url,
+                )
 
