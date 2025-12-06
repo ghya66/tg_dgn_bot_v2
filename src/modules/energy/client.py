@@ -1,6 +1,11 @@
 """
 TRXNO/TRXFAST API 客户端
 对接能量购买API
+
+改进：
+- 支持 async with 上下文管理器
+- 延迟创建 httpx.AsyncClient（避免在事件循环外创建）
+- 提供优雅关闭机制
 """
 import httpx
 from typing import Optional, Dict, Any
@@ -10,7 +15,6 @@ from .models import (
     APIAccountInfo,
     APIPriceQuery,
     APIOrderResponse,
-    EnergyPackage,
 )
 
 
@@ -23,8 +27,22 @@ class EnergyAPIError(Exception):
 
 
 class EnergyAPIClient:
-    """能量API客户端"""
-    
+    """
+    能量API客户端
+
+    支持两种使用方式：
+    1. 上下文管理器（推荐）：
+       async with EnergyAPIClient(...) as client:
+           await client.get_account_info()
+
+    2. 手动管理：
+       client = EnergyAPIClient(...)
+       try:
+           await client.get_account_info()
+       finally:
+           await client.close()
+    """
+
     # API状态码
     CODE_SUCCESS = 10000
     CODE_PARAM_ERROR = 10001
@@ -35,7 +53,7 @@ class EnergyAPIClient:
     CODE_ADDRESS_NOT_ACTIVATED = 10009
     CODE_SERVER_ERROR = 10010
     CODE_PACKAGE_EXISTS = 10011
-    
+
     def __init__(
         self,
         username: str,
@@ -46,7 +64,7 @@ class EnergyAPIClient:
     ):
         """
         初始化API客户端
-        
+
         Args:
             username: API用户名
             password: API密码
@@ -59,12 +77,34 @@ class EnergyAPIClient:
         self.base_url = base_url
         self.backup_url = backup_url
         self.timeout = timeout
-        
-        self._client = httpx.AsyncClient(timeout=timeout)
-    
+
+        # 延迟创建客户端（避免在事件循环外创建）
+        self._client: Optional[httpx.AsyncClient] = None
+        self._closed = False
+
+    def _get_client(self) -> httpx.AsyncClient:
+        """获取或创建 HTTP 客户端"""
+        if self._closed:
+            raise RuntimeError("EnergyAPIClient has been closed")
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=self.timeout)
+        return self._client
+
+    async def __aenter__(self) -> "EnergyAPIClient":
+        """进入上下文管理器"""
+        return self
+
+    async def __aexit__(self, *_args) -> None:
+        """退出上下文管理器"""
+        await self.close()
+
     async def close(self):
         """关闭客户端"""
-        await self._client.aclose()
+        if self._client is not None and not self._closed:
+            await self._client.aclose()
+            self._client = None
+            self._closed = True
+            logger.debug("EnergyAPIClient closed")
     
     async def _request(
         self,
@@ -99,8 +139,9 @@ class EnergyAPIClient:
         try:
             # 安全加固：只记录端点，不打印完整请求数据
             logger.info(f"API请求: {endpoint}")
-            
-            response = await self._client.post(
+
+            client = self._get_client()
+            response = await client.post(
                 url,
                 json=request_data,
                 headers={"Content-Type": "application/json"}
@@ -294,17 +335,22 @@ class EnergyAPIClient:
     async def query_order(self, order_id: str) -> APIOrderResponse:
         """
         查询订单状态
-        
+
         Args:
-            order_id: 订单ID
-        
+            order_id: 订单ID（trxfast.com 返回的订单号）
+
         Returns:
-            订单信息
+            订单信息，包含：
+            - data.status: 订单状态 (1=成功, 0=失败)
+            - data.hash: 交易哈希 ("Waiting"=处理中)
+            - data.orderid: 订单号
+            - data.re_address: 接收地址
+            - data.re_value: 能量数量
         """
-        data = {"order_id": order_id}
-        
-        result = await self._request("/api/order", data)
-        
+        data = {"orderid": order_id}  # 修复：参数名改为 orderid
+
+        result = await self._request("/api/orderinfo", data)  # 修复：端点改为 /api/orderinfo
+
         return APIOrderResponse(
             code=result.get("code"),
             msg=result.get("msg"),

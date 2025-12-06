@@ -6,6 +6,7 @@ Telegram Bot 主程序入口 - 新架构版本
 
 import asyncio
 import logging
+import os
 import uvicorn
 from typing import Optional
 from telegram.ext import Application
@@ -26,16 +27,33 @@ from src.wallet.wallet_manager import WalletManager
 from src.payments.order import order_manager
 from src.payments.suffix_manager import suffix_manager
 from src.tasks.order_expiry import order_expiry_task
+from src.tasks.energy_sync import get_energy_sync_task, run_energy_sync
 from src.rates.jobs import refresh_usdt_rates_job
+
+# 导入 TRX 支付监听器
+from src.modules.trx_exchange.payment_monitor import (
+    get_monitor as get_payment_monitor,
+    start_payment_monitor,
+    stop_payment_monitor,
+)
 
 # 导入API
 from src.api import create_api_app
 
+# 导入结构化日志配置
+from src.common.logging_config import setup_logging
+
 
 # 配置日志
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+# 环境变量控制：LOG_FORMAT=json 启用 JSON 格式，LOG_LEVEL 控制级别
+log_format_json = os.environ.get("LOG_FORMAT", "").lower() == "json"
+log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+log_file = os.environ.get("LOG_FILE")  # 可选：日志文件路径
+
+setup_logging(
+    level=log_level,
+    json_format=log_format_json,
+    log_file=log_file
 )
 logger = logging.getLogger(__name__)
 
@@ -69,7 +87,14 @@ class TelegramBotV2:
             write_timeout=30.0,
             pool_timeout=30.0
         )
-        self.app = Application.builder().token(settings.bot_token).request(request).build()
+        # 注意: Python 3.13 需要禁用 JobQueue 以避免 weakref 兼容性问题
+        self.app = (
+            Application.builder()
+            .token(settings.bot_token)
+            .request(request)
+            .job_queue(None)  # 禁用 JobQueue (Python 3.13 兼容)
+            .build()
+        )
         
         # 4. 初始化钱包管理器
         self.wallet_manager = WalletManager()
@@ -241,10 +266,29 @@ class TelegramBotV2:
         
         # 设置Bot命令菜单
         await self._setup_bot_commands()
-        
+
         # 初始化定时任务
         await self._init_scheduler()
-    
+
+        # 检查生产环境关键配置
+        await self._check_production_config()
+
+        # 启动 TRX 支付监听器
+        await self._start_payment_monitor()
+
+    async def _start_payment_monitor(self):
+        """启动 TRX 支付监听器"""
+        try:
+            # 设置 Bot 实例用于发送用户通知
+            monitor = get_payment_monitor()
+            monitor.set_bot(self.app.bot)
+
+            # 启动监听器（后台任务）
+            await start_payment_monitor()
+            logger.info("✅ TRX 支付监听器已启动")
+        except Exception as e:
+            logger.error(f"启动 TRX 支付监听器失败: {e}", exc_info=True)
+
     async def _global_error_handler(self, update: object, context) -> None:
         """
         全局异常处理器
@@ -310,10 +354,10 @@ class TelegramBotV2:
     async def _init_scheduler(self):
         """初始化定时任务"""
         self.scheduler = AsyncIOScheduler(timezone="UTC")
-        
+
         # 绑定 Bot 实例到订单过期任务（用于发送通知）
         order_expiry_task.set_bot(self.app.bot)
-        
+
         # 订单过期检查（每分钟）
         self.scheduler.add_job(
             order_expiry_task.check_and_expire_orders,
@@ -322,7 +366,7 @@ class TelegramBotV2:
             id='check_expired_orders',
             replace_existing=True
         )
-        
+
         # USDT汇率刷新（每12小时）
         # refresh_usdt_rates_job需要context参数，创建一个包装函数
         async def refresh_rates_wrapper():
@@ -335,10 +379,65 @@ class TelegramBotV2:
             id='refresh_usdt_rates',
             replace_existing=True
         )
-        
+
+        # 能量订单状态同步（每5分钟）
+        energy_sync_task = get_energy_sync_task()
+        energy_sync_task.set_bot(self.app.bot)
+        self.scheduler.add_job(
+            run_energy_sync,
+            'interval',
+            minutes=5,
+            id='energy_sync',
+            name='能量订单状态同步',
+            replace_existing=True
+        )
+        logger.info("✅ 能量订单状态同步任务已注册")
+
         self.scheduler.start()
         logger.info("✅ 定时任务调度器已启动")
-    
+
+    async def _check_production_config(self):
+        """检查生产环境关键配置"""
+        env = getattr(settings, 'env', 'dev').lower()
+        is_prod = env in ('prod', 'production')
+
+        if is_prod:
+            logger.info("🔍 检查生产环境配置...")
+
+            # 检查 TRX 测试模式
+            test_mode = getattr(settings, 'trx_exchange_test_mode', True)
+            if test_mode:
+                logger.critical(
+                    "❌ PRODUCTION CONFIG ERROR: TRX_EXCHANGE_TEST_MODE=True\n"
+                    "   TRX transfers will NOT be executed! Set to False for production."
+                )
+            else:
+                logger.info("✅ TRX_EXCHANGE_TEST_MODE=False (生产模式)")
+
+            # 检查 API Keys
+            api_keys = getattr(settings, 'api_keys', [])
+            if not api_keys:
+                logger.warning(
+                    "⚠️ PRODUCTION WARNING: API_KEYS not configured. "
+                    "API endpoints will reject all requests."
+                )
+            else:
+                logger.info(f"✅ API_KEYS configured ({len(api_keys)} keys)")
+
+            # 检查 Bot Owner ID
+            owner_id = getattr(settings, 'bot_owner_id', 0)
+            if not owner_id:
+                logger.warning(
+                    "⚠️ PRODUCTION WARNING: BOT_OWNER_ID not configured. "
+                    "Admin notifications will be disabled."
+                )
+            else:
+                logger.info(f"✅ BOT_OWNER_ID configured ({owner_id})")
+
+            logger.info("🔍 生产环境配置检查完成")
+        else:
+            logger.info(f"ℹ️ 当前环境: {env} (非生产环境，跳过严格配置检查)")
+
     async def start_with_api(self):
         """同时启动Bot和API服务"""
         logger.info("🚀 启动 Bot V2 with API...")
@@ -405,22 +504,26 @@ class TelegramBotV2:
     async def stop(self):
         """停止Bot"""
         logger.info("⏹️ 正在停止 Bot...")
-        
+
+        # 停止 TRX 支付监听器
+        stop_payment_monitor()
+        logger.info("✅ TRX 支付监听器已停止")
+
         # 停止定时任务
         if self.scheduler:
             self.scheduler.shutdown()
             logger.info("✅ 定时任务调度器已停止")
-        
+
         # 停止Telegram应用
         if self.app:
             await self.app.updater.stop()
             await self.app.stop()
             await self.app.shutdown()
-        
+
         # 断开Redis
         await order_manager.disconnect()
         await suffix_manager.disconnect()
-        
+
         # 关闭全局 HTTP 客户端
         from src.common.http_client import close_async_client
         await close_async_client()

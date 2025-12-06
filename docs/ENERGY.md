@@ -184,6 +184,28 @@ Response: {
 
 ```text
 
+#### 5. 订单状态查询
+
+```python
+POST /api/orderinfo
+Body: {
+    "orderid": "ORDER_123456"   # 订单ID
+}
+Response: {
+    "code": 10000,
+    "msg": "success",
+    "data": {
+        "status": 1,            # Int: 1=成功, 0=失败
+        "hash": "abc123..."     # 交易哈希（"Waiting"=处理中）
+    }
+}
+```
+
+**状态映射逻辑**:
+- `hash == "Waiting"` → 订单处理中
+- `status == 1` → 订单成功完成
+- `status == 0` → 订单失败
+
 ### 状态码说明
 
 | 状态码 | 说明 |
@@ -513,6 +535,7 @@ tail -f /var/log/bot.log | grep "API请求\|API响应"
 - [x] 余额扣费集成
 
 - [x] 数据库持久化
+- [x] 订单状态同步任务（v2.0.2）
 
 ### 待实现 🔲
 
@@ -527,8 +550,51 @@ tail -f /var/log/bot.log | grep "API请求\|API响应"
 
 - [ ] 测试套件完善
 
+## ⏰ 后台定时任务
+
+### 订单状态同步任务 (EnergySyncTask)
+
+- **执行频率**: 每 5 分钟
+- **功能**: 自动从 trxfast.com API 同步能量订单状态
+- **文件**: `src/tasks/energy_sync.py`
+
+#### 工作流程
+
+```text
+1. 查询最近24小时内状态为 PENDING/PROCESSING 的能量订单
+2. 调用 /api/orderinfo 接口查询每个订单的最新状态
+3. 根据 API 返回状态更新本地数据库：
+   - hash == "Waiting" → 保持 PROCESSING
+   - status == 1 → 更新为 COMPLETED
+   - status == 0 → 更新为 FAILED
+4. 订单状态变化时通过 Telegram 通知用户
+```
+
+#### 用户通知示例
+
+**订单完成**:
+```
+✅ 能量订单完成
+
+订单号: ORD_xxx
+能量数量: 65,000
+接收地址: TXxx...xxx
+
+能量已成功发送到您的地址！
+```
+
+**订单失败**:
+```
+❌ 能量订单失败
+
+订单号: ORD_xxx
+原因: API返回失败
+
+请联系客服处理。
+```
+
 ---
 
 **最后更新**: 2025-12-06
-**版本**: v2.0.1
+**版本**: v2.0.2
 **作者**: TG DGN Bot Team
