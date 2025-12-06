@@ -125,7 +125,8 @@ class PremiumModule(BaseModule):
                 # 不再匹配其他模块的入口按钮，避免冲突
             ],
             allow_reentry=True,
-            name="premium_standard"
+            name="premium_standard",
+            conversation_timeout=600,  # 10分钟超时
         )
     
     async def start_premium(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -262,70 +263,100 @@ class PremiumModule(BaseModule):
     async def username_entered(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """处理输入的用户名"""
         text = update.message.text.strip()
-        
+
+        # 获取重试次数
+        state = self.state_manager.get_state(context, self.module_name)
+        retry_count = state.get('username_retry_count', 0)
+
+        # 检查重试限制（最多3次）
+        if retry_count >= 3:
+            await update.message.reply_text(
+                "❌ 重试次数过多，请稍后再试\n\n"
+                "返回主菜单重新操作",
+                parse_mode="HTML"
+            )
+            # 清理重试计数
+            state.pop('username_retry_count', None)
+            return ConversationHandler.END
+
         # 解析用户名
         if text.startswith('@'):
             username = text[1:]
         else:
             username = text
-        
+
         # 验证格式
         from .recipient_parser import RecipientParser
         if not RecipientParser.validate_username(username):
+            # 增加重试计数
+            state['username_retry_count'] = retry_count + 1
+            remaining = 3 - state['username_retry_count']
             await update.message.reply_text(
-                PremiumMessages.INVALID_USERNAME,
+                f"{PremiumMessages.INVALID_USERNAME}\n\n⚠️ 剩余重试次数：{remaining}",
                 parse_mode='HTML'
             )
             return ENTERING_USERNAME
         
-        # 验证用户是否存在
-        result = await self.verification_service.verify_user_exists(username)
-        
+        # 验证用户是否存在（传递 bot 实例以支持 Telegram API 验证）
+        result = await self.verification_service.verify_user_exists(username, bot=context.bot)
+
         # 保存状态
         state = self.state_manager.get_state(context, self.module_name)
         state['recipient_username'] = username
-        
-        if result['exists'] and result['is_verified']:
-            # 用户已验证
+
+        if result['exists']:
+            # 用户存在（本地已验证 或 Telegram API 验证通过），清理重试计数
             state['recipient_id'] = result['user_id']
             state['recipient_nickname'] = result['nickname']
-            
+            state.pop('username_retry_count', None)  # 清理重试计数
+
             # 对用户名和昵称进行转义
             escaped_username = self.formatter.escape_html(username)
-            escaped_nickname = self.formatter.escape_html(result['nickname'])
-            
+            escaped_nickname = self.formatter.escape_html(result['nickname'] or username)
+
             text = PremiumMessages.USER_FOUND.format(
                 username=escaped_username,
                 nickname=escaped_nickname
             )
-            
+
             await update.message.reply_text(
                 text,
                 reply_markup=PremiumKeyboards.confirm_user_keyboard(),
                 parse_mode='HTML'
             )
-            
+
             return VERIFYING_USERNAME
         else:
-            # 用户不存在或未验证
+            # 用户不存在
             escaped_username = self.formatter.escape_html(username)
-            if not result['exists']:
+
+            # 检查是否有具体错误信息
+            error_msg = result.get('error')
+            if error_msg:
+                # 使用 Telegram API 返回的错误信息
+                text = PremiumMessages.USER_NOT_FOUND_SIMPLE.format(
+                    username=escaped_username,
+                    error=error_msg
+                )
+            elif result.get('binding_url'):
+                # 回退模式：需要先交互
                 text = PremiumMessages.USER_NOT_FOUND.format(
                     username=escaped_username,
                     binding_url=result.get('binding_url', '')
                 )
             else:
-                text = PremiumMessages.USER_NOT_VERIFIED.format(
-                    username=escaped_username
+                text = PremiumMessages.USER_NOT_FOUND_SIMPLE.format(
+                    username=escaped_username,
+                    error="用户名不存在或无效"
                 )
-            
+
             await update.message.reply_text(
                 text,
                 reply_markup=PremiumKeyboards.retry_or_cancel_keyboard(),
                 parse_mode='HTML',
                 disable_web_page_preview=True
             )
-            
+
             return AWAITING_USERNAME_ACTION
     
     async def confirm_username(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

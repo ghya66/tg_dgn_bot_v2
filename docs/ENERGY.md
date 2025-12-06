@@ -62,26 +62,30 @@ src/modules/energy/           # 标准化模块目录
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| order_id | VARCHAR | 订单ID（主键）|
+| order_id | VARCHAR(36) | 订单ID（主键）|
 | user_id | INTEGER | 用户TG ID |
-| order_type | VARCHAR | 订单类型（hourly/package/flash）|
+| order_type | VARCHAR(20) | 订单类型（hourly/package/flash）|
 | energy_amount | INTEGER | 能量数量（65000/131000）|
 | purchase_count | INTEGER | 购买笔数（1-20）|
 | package_count | INTEGER | 套餐笔数 |
 | usdt_amount | FLOAT | USDT金额 |
-| receive_address | VARCHAR | 接收地址 |
+| receive_address | VARCHAR(64) | 接收地址 |
 | total_price_trx | FLOAT | 总价(TRX) |
 | total_price_usdt | FLOAT | 总价(USDT) |
-| status | VARCHAR | 状态（PENDING/PROCESSING/COMPLETED/FAILED）|
-| api_order_id | VARCHAR | API订单ID |
-| error_message | VARCHAR | 错误信息 |
+| status | VARCHAR(20) | 状态（PENDING/PROCESSING/COMPLETED/FAILED/EXPIRED）|
+| api_order_id | VARCHAR(64) | API订单ID |
+| error_message | VARCHAR(500) | 错误信息 |
 | created_at | DATETIME | 创建时间 |
 | completed_at | DATETIME | 完成时间 |
+| expires_at | DATETIME | 订单过期时间 |
+| user_tx_hash | VARCHAR(100) | 用户交易哈希 |
+| user_confirmed_at | DATETIME | 用户确认时间 |
 
 **索引**:
 
 - `idx_energy_user_status` (user_id, status)
 - `idx_energy_order_type` (order_type)
+- `idx_energy_api_order` (api_order_id)
 
 ## 🔌 API 对接
 
@@ -525,6 +529,6 @@ tail -f /var/log/bot.log | grep "API请求\|API响应"
 
 ---
 
-**最后更新**: 2025-10-28  
-**版本**: v1.0.0  
+**最后更新**: 2025-12-06
+**版本**: v2.0.1
 **作者**: TG DGN Bot Team

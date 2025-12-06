@@ -87,7 +87,8 @@ class TRXExchangeModule(BaseModule):
                 CommandHandler("cancel", self.cancel),
                 CallbackQueryHandler(self.cancel_input, pattern="^trx_cancel_input$"),
             ],
-            name="trx_exchange"
+            name="trx_exchange",
+            conversation_timeout=600,  # 10分钟超时
         )
     
     def generate_order_id(self) -> str:

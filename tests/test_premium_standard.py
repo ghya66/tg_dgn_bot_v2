@@ -23,6 +23,8 @@ class MockContext:
         self.user_data = {}
         self.chat_data = {}
         self.bot_data = {}
+        # 添加 bot 属性，以支持 verify_user_exists(username, bot=context.bot) 调用
+        self.bot = MagicMock()
 
 
 def create_mock_update(callback_data=None, message_text=None, username="testuser", first_name="Test"):

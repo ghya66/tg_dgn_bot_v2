@@ -55,7 +55,7 @@ class PremiumMessages:
 
 确认为此用户开通 Premium？"""
 
-    # 用户未找到
+    # 用户未找到（回退模式：需要先交互）
     USER_NOT_FOUND = """⚠️ <b>用户 @{username} 未找到</b>
 
 可能原因：
@@ -64,6 +64,18 @@ class PremiumMessages:
 
 请让对方先点击以下链接与Bot交互：
 {binding_url}"""
+
+    # 用户未找到（简化版：Telegram API 验证失败）
+    USER_NOT_FOUND_SIMPLE = """❌ <b>该用户名不存在或无效</b>
+
+输入的用户名：@{username}
+错误信息：{error}
+
+请检查用户名是否正确后重新输入。
+
+用户名需要：
+• 5-32个字符
+• 仅包含字母、数字、下划线"""
 
     # 用户未验证
     USER_NOT_VERIFIED = """⚠️ <b>用户 @{username} 未验证</b>

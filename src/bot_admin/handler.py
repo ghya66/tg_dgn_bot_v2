@@ -777,7 +777,15 @@ class AdminHandler:
                 reply_markup=self.menus.back_to_main(),
                 parse_mode="HTML"
             )
-    
+
+    async def _handle_cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """处理取消命令"""
+        await update.message.reply_text(
+            "✅ 已取消当前操作\n\n使用 /admin 返回管理面板",
+            parse_mode="HTML"
+        )
+        return ConversationHandler.END
+
     # ==================== ConversationHandler ====================
     
     def get_conversation_handler(self) -> ConversationHandler:
@@ -865,7 +873,7 @@ class AdminHandler:
                 ],
             },
             fallbacks=[
-                CommandHandler("cancel", lambda u, c: ConversationHandler.END)
+                CommandHandler("cancel", self._handle_cancel)
             ],
             allow_reentry=True,
             per_chat=True,

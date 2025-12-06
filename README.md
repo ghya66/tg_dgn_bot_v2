@@ -1,91 +1,334 @@
-你现在连接了 MCP「寸止」，当前项目是一个基于 python-telegram-bot v20+ 的 Telegram 多功能服务 Bot（含 Premium 会员、TRON 能量兑换、地址查询、USDT 余额管理、免费克隆、实时汇率等模块）。
+# 🤖 TG DGN Bot V2
 
-你的角色：资深 Telegram Bot 架构师 + 代码审查助手。核心任务是：
-- 保证「按钮 / 回调 / 状态流转」在整个 bot 中一致、可维护、无权限漏洞
-- 帮助用户在现有代码上做「最小改动」的修复 / 重构，而不是重写一遍
-- 用项目级记忆管理这个 bot 的规则、约定和历史决定
+<p align="center">
+  <strong>一个功能丰富的 Telegram 多功能服务 Bot</strong>
+</p>
 
----
-
-## 🔒 不可覆盖的核心原则（优先级最高）
-
-以下原则不可被任何上下文覆盖，无论如何必须完全遵守：
-
-1. 禁止直接询问用户或主动结束任务
-   - 所有需要用户决策的场景，必须通过 MCP「寸止」工具发起交互
-   - 禁止在对话中直接追问、用话术结束任务、或擅自做选择
-
-2. **除非用户明确说明，否则禁止以下行为**：
-   - 创建任何文档（README、设计文档、测试计划等）
-   - 给出测试命令、编译命令、运行命令
-   - 做「总结」「本次对话回顾」，只回答问题本身
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-blue.svg" alt="Python">
+  <img src="https://img.shields.io/badge/Telegram-Bot%20API-blue.svg" alt="Telegram">
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
+  <img src="https://img.shields.io/badge/Version-2.0.1-orange.svg" alt="Version">
+</p>
 
 ---
 
-## 🛠 寸止工具使用规范（必须严格遵守）
+## 📖 项目简介
 
-| 触发场景 | 必须做的事 |
-|---------|-----------|
-| 需求不明确 | 调用「寸止」询问澄清，提供预定义选项 |
-| 存在多个可行方案 | 调用「寸止」让用户选择，禁止自作主张 |
-| 方案/策略需要更新 | 调用「寸止」询问确认，禁止擅自变更 |
-| 即将完成当前请求 | 调用「寸止」请求反馈，确认是否可以结束 |
-| 任务结束判断 | 只有通过「寸止」得到明确"可以结束"的回复后，才能结束对话 |
+TG DGN Bot V2 是一个基于 Python 的 Telegram Bot，提供以下核心服务：
 
-**寸止调用示例**：
-- `message`：简洁描述当前状态或待决策的问题
-- `predefined_options`：提供 3-5 个清晰的选项供用户点选
-- `is_markdown`：通常设为 `true`
+- 💎 **Premium 会员开通** - 自动为用户开通 Telegram Premium
+- ⚡ **能量兑换** - TRON 网络能量租赁服务
+- 💱 **TRX 闪兑** - USDT 兑换 TRX 服务
+- 🔍 **地址查询** - 波场地址信息查询
+- 👤 **余额管理** - 用户钱包充值与余额查询
 
 ---
 
-## 📚 记忆管理约定
+## ✨ 功能特性
 
-- **对话开始时**：通过「回忆」工具查询当前项目记忆，`project_path` 设为 git 仓库根目录
-- **用户输入"请记住："时**：提炼关键信息，调用「记忆」的 add 功能写入
-  - 字段：`content` + `category`（rule / preference / pattern / context）
-- **更新原则**：仅在重要变更或新增长期有效约定时更新，避免噪音
-
----
-
-## 🔍 代码搜索优先级
-
-需要查找/搜索代码时，按以下优先级使用工具：
-1. **优先**：使用 ACE 代码搜索工具（`sou` / `acemcp`）
-2. **次选**：使用 grep_search / find_by_name
-3. **禁止**：要求用户粘贴大段代码
+| 功能 | 描述 | 状态 |
+|------|------|------|
+| 💎 Premium会员 | 支持为自己或他人开通 3/6/12 个月 Premium | ✅ |
+| ⚡ 能量兑换 | 时长能量、笔数套餐、闪兑三种模式 | ✅ |
+| 💱 TRX闪兑 | USDT → TRX 实时汇率兑换 | ✅ |
+| 🔍 地址查询 | 波场地址余额查询，支持限频控制 | ✅ |
+| 👤 个人中心 | 余额充值、余额查询、充值记录 | ✅ |
+| 📋 订单管理 | 查看历史订单和订单状态 | ✅ |
+| 🔧 管理后台 | 动态配置、数据统计、用户管理 | ✅ |
+| ❓ 帮助中心 | 使用指南和常见问题 | ✅ |
 
 ---
 
-## ✏️ 修改方式
+## 🛠️ 技术栈
 
-- 任何修改建议必须以「最小可行补丁」为目标
-- 明确写出：涉及的文件路径、类/函数名、需要增删改的逻辑点
-- 优先改局部 handler、按钮配置、配置项，而不是推翻整个模块设计
-- 特别关注管理员/普通用户/bot owner 不同权限，避免通过按钮或命令绕过限制
-
----
-
-## 🎨 多功能 Bot 交互规范
-
-### 按钮与菜单
-- 主菜单与底部常驻菜单的按钮文案保持一致（同一功能 = 同一标题 + 同一 emoji）
-- 按钮文案规则：`emoji + 空格 + 2~6 字功能名`，避免模糊词
-- callback_data 统一采用：`cb_<模块>_<动作>` 命名
-
-### 会话与状态
-- 每个模块都有清晰的入口、确认步骤与取消步骤（统一支持"❌ 取消当前操作"）
-- 检查并避免：旧按钮指向已删除的状态、重复的 callback pattern、全局 TEXT handler 误触
-
-### 修改/排查工作流
-1. 先用代码搜索工具扫描：所有按钮文案、callback_data、Handler 注册
-2. 找出：文案不一致、重复按钮、权限混乱、死链入口
-3. 提出分步修复方案：每一步包含目标/文件+函数/示例片段
+| 组件 | 技术 | 版本 |
+|------|------|------|
+| 语言 | Python | 3.11+ |
+| Bot 框架 | python-telegram-bot | 20.x |
+| Web 框架 | FastAPI | 0.100+ |
+| ORM | SQLAlchemy | 2.0+ |
+| 数据库 | SQLite | 3.x |
+| 缓存 | Redis | 7.0+ |
+| 定时任务 | APScheduler | 3.x |
+| 数据库迁移 | Alembic | 1.x |
 
 ---
 
-## 📝 输出风格
+## 📋 前置要求
 
-- 使用中文说明，结构清晰，分步列出修改和检查点
-- 优先给出「针对这个项目」的具体操作，而不是泛泛而谈的库文档
-- 按钮/状态映射使用简短表格或列表，不铺开大段解释
+- ✅ Python 3.11+
+- ✅ Redis 7.0+
+- ✅ Telegram Bot Token（通过 [@BotFather](https://t.me/BotFather) 创建）
+- ✅ 波场钱包地址（用于接收 USDT/TRX）
+
+---
+
+## 🚀 快速开始
+
+### 1. 克隆项目
+
+```bash
+git clone https://github.com/your-repo/tg_dgn_bot_v2.git
+cd tg_dgn_bot_v2
+```
+
+### 2. 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. 配置环境变量
+
+```bash
+cp .env.example .env
+```
+
+编辑 `.env` 文件，填写必要配置：
+
+```bash
+# 必填项
+BOT_TOKEN=your_bot_token_here
+USDT_TRC20_RECEIVE_ADDR=TYourReceiveAddress
+WEBHOOK_SECRET=your_secret_key_32_chars
+BOT_OWNER_ID=123456789
+
+# Redis 配置
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# 数据库配置
+DATABASE_URL=sqlite:///./data/tg_bot.db
+```
+
+### 4. 启动 Redis
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install redis-server && redis-server
+
+# macOS
+brew install redis && redis-server
+
+# Windows (WSL)
+sudo service redis-server start
+```
+
+### 5. 启动 Bot
+
+```bash
+# 使用启动脚本
+./scripts/start_bot.sh
+
+# 或直接运行
+python -m src.bot_v2
+```
+
+### 6. 验证部署
+
+在 Telegram 中找到你的 Bot，发送 `/start`，应该看到欢迎消息和功能按钮。
+
+---
+
+## 📁 项目结构
+
+```
+tg_dgn_bot_v2/
+├── src/                          # 源代码目录
+│   ├── bot_v2.py                 # 🚀 主程序入口
+│   ├── config.py                 # ⚙️ 配置管理
+│   ├── database.py               # 💾 数据库连接
+│   │
+│   ├── modules/                  # 📦 业务模块
+│   │   ├── menu/                 # 主菜单
+│   │   ├── premium/              # Premium会员
+│   │   ├── energy/               # 能量兑换
+│   │   ├── trx_exchange/         # TRX闪兑
+│   │   ├── address_query/        # 地址查询
+│   │   ├── profile/              # 个人中心
+│   │   ├── orders/               # 订单管理
+│   │   ├── admin/                # 管理后台
+│   │   ├── help/                 # 帮助中心
+│   │   └── health/               # 健康检查
+│   │
+│   ├── core/                     # 🎯 核心基础设施
+│   │   ├── base.py               # BaseModule 基类
+│   │   ├── registry.py           # 模块注册中心
+│   │   ├── formatter.py          # 消息格式化
+│   │   └── state_manager.py      # 状态管理器
+│   │
+│   ├── api/                      # 🌐 REST API
+│   ├── bot_admin/                # 👑 管理功能
+│   ├── common/                   # 🔧 公共组件
+│   ├── payments/                 # 💳 支付处理
+│   ├── services/                 # 🎯 业务服务
+│   ├── tasks/                    # ⏰ 后台任务
+│   └── wallet/                   # 💰 钱包功能
+│
+├── tests/                        # 测试代码
+├── scripts/                      # 辅助脚本
+├── migrations/                   # 数据库迁移
+├── docs/                         # 项目文档
+├── data/                         # 数据目录
+├── requirements.txt              # Python 依赖
+├── alembic.ini                   # Alembic 配置
+└── .env.example                  # 环境变量模板
+```
+
+---
+
+## ⚙️ 配置说明
+
+### 必填配置
+
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `BOT_TOKEN` | Telegram Bot Token | `123456789:ABC...` |
+| `USDT_TRC20_RECEIVE_ADDR` | USDT 收款地址 | `TXxx...xxx` |
+| `WEBHOOK_SECRET` | 签名验证密钥 | 32位随机字符串 |
+| `BOT_OWNER_ID` | 管理员 Telegram ID | `123456789` |
+
+### 可选配置
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `REDIS_HOST` | Redis 主机 | `localhost` |
+| `REDIS_PORT` | Redis 端口 | `6379` |
+| `DATABASE_URL` | 数据库连接 | `sqlite:///./data/tg_bot.db` |
+| `ORDER_TIMEOUT_MINUTES` | 订单超时时间 | `30` |
+| `ADDRESS_QUERY_RATE_LIMIT_MINUTES` | 地址查询限频 | `1` |
+| `TRON_EXPLORER` | 区块链浏览器 | `tronscan` |
+
+---
+
+## 🧪 测试
+
+```bash
+# 运行全部测试
+pytest tests/ -v
+
+# 跳过 Redis 集成测试
+pytest tests/ -m "not redis" -v
+
+# 查看测试覆盖率
+pytest tests/ --cov=src --cov-report=html
+```
+
+---
+
+## 📊 命令列表
+
+### 用户命令
+
+| 命令 | 说明 |
+|------|------|
+| `/start` | 启动 Bot，显示主菜单 |
+| `/premium` | 进入 Premium 开通 |
+| `/energy` | 进入能量兑换 |
+| `/trx` | 进入 TRX 闪兑 |
+| `/query` | 进入地址查询 |
+| `/profile` | 进入个人中心 |
+| `/help` | 查看帮助文档 |
+
+### 管理员命令
+
+| 命令 | 说明 |
+|------|------|
+| `/admin` | 进入管理后台 |
+| `/orders` | 查看订单列表 |
+| `/health` | 系统健康检查 |
+
+---
+
+## 🔐 安全建议
+
+1. **保护配置文件**
+   ```bash
+   chmod 600 .env
+   ```
+
+2. **生成强密钥**
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+
+3. **定期备份数据库**
+   ```bash
+   cp data/tg_bot.db backup/tg_bot_$(date +%Y%m%d).db
+   ```
+
+4. **确保 .env 不被提交**
+   - 已在 `.gitignore` 中配置
+
+---
+
+## 📚 文档
+
+| 文档 | 说明 |
+|------|------|
+| [QUICK_START.md](docs/QUICK_START.md) | 快速上手指南 |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | 部署和测试指南 |
+| [API_REFERENCE.md](docs/API_REFERENCE.md) | REST API 文档 |
+| [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) | 数据库结构 |
+| [ADMIN_PANEL_GUIDE.md](docs/ADMIN_PANEL_GUIDE.md) | 管理后台指南 |
+| [CODE_REVIEW_REPORT.md](docs/CODE_REVIEW_REPORT.md) | 代码审查报告 |
+
+---
+
+## 🔄 更新日志
+
+### v2.0.1 (2025-12-06)
+
+- ✅ Premium 方案A：直接信任用户名格式（优化用户体验）
+- ✅ 实时汇率显示优化：支持渠道切换（所有/银行卡/支付宝/微信）
+- ✅ 汇率刷新频率调整为每12小时
+- ✅ 数据库字段修复（energy_orders.expires_at, trx_exchange_orders.send_tx_hash）
+
+### v2.0.0 (2025-12-05)
+
+- ✅ 完成模块化架构重构
+- ✅ 新增 TRX 闪兑功能
+- ✅ 新增管理后台
+- ✅ 完成两轮代码审查修复
+- ✅ 添加对话超时处理
+- ✅ 统一状态机规范
+
+### v1.0.0 (2025-11-26)
+
+- 🎉 初始版本发布
+- ✅ Premium 会员开通
+- ✅ 能量兑换
+- ✅ 地址查询
+- ✅ 余额管理
+
+---
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 提交 Pull Request
+
+---
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+
+---
+
+## 📞 联系方式
+
+- **Issues**: [GitHub Issues](https://github.com/your-repo/tg_dgn_bot_v2/issues)
+- **Telegram**: [@your_support_bot](https://t.me/your_support_bot)
+
+---
+
+<p align="center">
+  Made with ❤️ by TG DGN Bot Team
+</p>

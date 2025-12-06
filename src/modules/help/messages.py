@@ -142,8 +142,3 @@ A: 虚拟商品不支持退款"""
    点击"TRX 兑换" → 输入金额 → 转账 USDT
 
 <b>提示：</b> 支付时请确保金额精确到3位小数！"""
-    
-    # 兼容旧属性（静态访问）
-    PAYMENT_HELP = None  # 使用 get_payment_help()
-    SERVICES_HELP = None  # 使用 get_services_help()
-    QUERY_HELP = None  # 使用 get_query_help()

@@ -94,6 +94,7 @@ class EnergyModule(BaseModule):
             ],
             name="energy_conversation",
             allow_reentry=True,
+            conversation_timeout=600,  # 10分钟超时
         )
         
         return [conv_handler]

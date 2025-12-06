@@ -1,89 +1,124 @@
 """
 用户身份验证服务
 处理用户名验证、绑定和查询
+
+方案A：直接信任用户名格式（不通过 Telegram API 验证）
+- 原因：Telegram Bot API 的 get_chat() 只能查询已与 Bot 交互过的用户
+- 安全性：发货时如果用户名无效会失败，有完善的失败处理和通知机制
 """
 import logging
+import re
 from typing import Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
-from telegram import User
+from telegram import User, Bot
 
 from src.database import get_db, close_db, UserBinding
 from src.common.db_manager import get_db_context
 
 logger = logging.getLogger(__name__)
 
+# 用户名格式正则：5-32个字符，只能包含字母、数字和下划线
+USERNAME_PATTERN = re.compile(r'^[a-zA-Z][a-zA-Z0-9_]{4,31}$')
+
 
 class UserVerificationService:
     """用户身份验证服务"""
-    
+
     def __init__(self, bot_username: str = None):
         """
         初始化服务
-        
+
         Args:
             bot_username: Bot的用户名，用于生成绑定链接
         """
         self.bot_username = bot_username or "premium_bot"
-    
-    async def verify_user_exists(self, username: str) -> Dict[str, Any]:
+
+    def _is_valid_username_format(self, username: str) -> bool:
+        """
+        验证用户名格式是否有效
+
+        Telegram 用户名规则：
+        - 5-32 个字符
+        - 以字母开头
+        - 只能包含字母、数字和下划线
+
+        Args:
+            username: 用户名（不含@）
+
+        Returns:
+            是否格式有效
+        """
+        if not username:
+            return False
+        return bool(USERNAME_PATTERN.match(username))
+
+    async def verify_user_exists(self, username: str, bot: Bot = None) -> Dict[str, Any]:
         """
         验证用户是否存在
-        
+
+        方案A逻辑：
+        1. 先检查本地数据库是否有已验证的绑定
+        2. 如果本地没有，验证用户名格式是否正确
+        3. 格式正确则直接信任，允许进入套餐选择
+        4. 实际发货时如果用户名无效，会有失败处理机制
+
         Args:
             username: Telegram用户名（不含@）
-            
+            bot: Telegram Bot 实例（方案A中不再使用，保留参数以兼容调用）
+
         Returns:
             {
                 "exists": bool,
                 "user_id": Optional[int],
                 "nickname": Optional[str],
                 "is_verified": bool,
-                "binding_url": Optional[str]
+                "binding_url": Optional[str],
+                "error": Optional[str]
             }
         """
+        # 第一步：检查本地数据库（优先使用已验证的绑定信息）
         try:
             with get_db_context() as db:
                 binding = db.query(UserBinding).filter(
                     UserBinding.username == username.lower()
                 ).first()
-                
+
                 if binding and binding.is_verified:
-                    # 存在且已验证
+                    # 本地已有已验证用户，直接返回
+                    logger.info(f"User @{username} found in local database (verified)")
                     return {
                         "exists": True,
                         "user_id": binding.user_id,
                         "nickname": binding.nickname,
                         "is_verified": True,
-                        "binding_url": None
-                    }
-                elif binding:
-                    # 存在但未验证
-                    return {
-                        "exists": False,
-                        "user_id": binding.user_id,
-                        "nickname": binding.nickname,
-                        "is_verified": False,
-                        "binding_url": self._generate_binding_url(username)
-                    }
-                else:
-                    # 不存在
-                    return {
-                        "exists": False,
-                        "user_id": None,
-                        "nickname": None,
-                        "is_verified": False,
-                        "binding_url": self._generate_binding_url(username)
+                        "binding_url": None,
+                        "error": None
                     }
         except Exception as e:
-            logger.error(f"Error verifying user {username}: {e}")
-            # 返回安全的默认值
+            logger.error(f"Database error checking user {username}: {e}")
+
+        # 第二步：验证用户名格式（方案A：直接信任格式正确的用户名）
+        if self._is_valid_username_format(username):
+            logger.info(f"User @{username} format valid, trusting username (Plan A)")
+            return {
+                "exists": True,
+                "user_id": None,  # 暂无 user_id，发货时再解析
+                "nickname": username,  # 使用用户名作为昵称
+                "is_verified": False,  # 标记为未本地验证
+                "binding_url": None,
+                "error": None
+            }
+        else:
+            # 用户名格式无效
+            logger.info(f"User @{username} format invalid")
             return {
                 "exists": False,
                 "user_id": None,
                 "nickname": None,
                 "is_verified": False,
-                "binding_url": self._generate_binding_url(username)
+                "binding_url": None,
+                "error": "用户名格式无效，请检查：以字母开头，5-32个字符，只能包含字母、数字和下划线"
             }
     
     async def bind_user(self, user: User, force_update: bool = False) -> bool:

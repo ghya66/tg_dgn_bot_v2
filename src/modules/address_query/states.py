@@ -2,5 +2,5 @@
 地址查询模块状态定义
 """
 
-# 对话状态
-AWAITING_ADDRESS = 1
+# 对话状态（从0开始，与其他模块保持一致）
+AWAITING_ADDRESS = 0

@@ -1,6 +1,6 @@
 # 数据库表结构文档
 
-> 生成时间: 2025-11-27
+> 生成时间: 2025-12-06
 
 ## 概览
 
@@ -96,7 +96,8 @@
 | `recipient_address` | VARCHAR(64) | NOT NULL | 用户TRX接收地址 |
 | `payment_address` | VARCHAR(64) | NOT NULL | Bot USDT接收地址 |
 | `status` | VARCHAR(20) | NOT NULL DEFAULT 'PENDING' | 状态 |
-| `tx_hash` | VARCHAR(128) | NULLABLE | TRX转账哈希 |
+| `tx_hash` | VARCHAR(128) | NULLABLE | 用户支付交易哈希 |
+| `send_tx_hash` | VARCHAR(128) | NULLABLE | Bot发送TRX交易哈希 |
 | `created_at` | DATETIME | NOT NULL | 创建时间 |
 | `paid_at` | DATETIME | NULLABLE | 支付时间 |
 | `transferred_at` | DATETIME | NULLABLE | TRX转账时间 |
@@ -148,12 +149,14 @@
 | `error_message` | VARCHAR(500) | NULLABLE | 错误信息 |
 | `created_at` | DATETIME | NOT NULL | 创建时间 |
 | `completed_at` | DATETIME | NULLABLE | 完成时间 |
+| `expires_at` | DATETIME | NULLABLE | 订单过期时间 |
 | `user_tx_hash` | VARCHAR(100) | NULLABLE | 用户交易哈希 |
 | `user_confirmed_at` | DATETIME | NULLABLE | 用户确认时间 |
 
 **索引:**
 - `idx_energy_user_status` (user_id, status)
 - `idx_energy_order_type` (order_type)
+- `idx_energy_api_order` (api_order_id)
 
 ---
 

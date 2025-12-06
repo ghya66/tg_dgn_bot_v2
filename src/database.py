@@ -135,10 +135,11 @@ class EnergyOrder(Base):
     
     created_at = Column(DateTime, default=datetime.now, nullable=False)
     completed_at = Column(DateTime, nullable=True)  # 完成时间
+    expires_at = Column(DateTime, nullable=True)  # 订单过期时间
     # TODO: add Alembic migration for new user confirmation columns
     user_tx_hash = Column(String(100), nullable=True)
     user_confirmed_at = Column(DateTime, nullable=True)
-    
+
     # 创建索引
     __table_args__ = (
         Index('idx_energy_user_status', 'user_id', 'status'),

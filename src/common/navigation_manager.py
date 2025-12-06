@@ -101,7 +101,7 @@ class NavigationManager:
             if k in cls.PRESERVED_KEYS
         }
         
-        # 清理并恢夏
+        # 清理并恢复
         context.user_data.clear()
         context.user_data.update(preserved_data)
         
@@ -142,8 +142,18 @@ class NavigationManager:
     @staticmethod
     async def _show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """显示主菜单"""
-        from ..menu.main_menu import MainMenuHandler
-        await MainMenuHandler.show_main_menu(update, context)
+        from src.core.registry import get_registry
+        registry = get_registry()
+        main_menu_module = registry.get_module("main_menu")
+        if main_menu_module:
+            await main_menu_module.show_main_menu(update, context)
+        else:
+            # Fallback: 直接发送简单菜单
+            logger.warning("MainMenuModule not found in registry, using fallback")
+            query = update.callback_query
+            if query:
+                await query.answer()
+                await query.edit_message_text("请使用 /start 命令开始")
     
     @staticmethod
     async def _show_admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):

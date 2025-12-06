@@ -20,14 +20,17 @@ from sqlalchemy.orm import sessionmaker
 
 class TestPremiumSecurity:
     """Premium安全机制测试"""
-    
+
     @pytest.fixture
     def test_db(self):
         """创建测试数据库"""
         engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(engine)
         SessionLocal = sessionmaker(bind=engine)
-        return SessionLocal()
+        db = SessionLocal()
+        yield db
+        db.close()
+        engine.dispose()
     
     @pytest.fixture
     def security_service(self, test_db):
@@ -202,32 +205,36 @@ async def test_run_security_ci():
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
     test_db = SessionLocal()
-    
-    # Mock get_db_context 为返回 test_db 的上下文管理器
-    @contextmanager
-    def mock_db_context():
-        yield test_db
-    
-    with patch('src.modules.premium.security.get_db_context', mock_db_context):
-        with patch('src.modules.premium.security.get_db', return_value=test_db):
-            with patch('src.modules.premium.security.close_db'):
-                service = PremiumSecurityService()
-                
-                # 测试黑名单功能
-                user_id = 123456
-                await service.add_to_blacklist(user_id, "测试")
-                assert service.is_blacklisted(user_id)
-                
-                # 测试用户限额检查
-                result = await service.check_user_limits(999999)
-                assert result["allowed"] is True
-                
-                # 测试订单验证
-                result = await service.validate_order(
-                    user_id=888888,
-                    premium_months=3
-                )
-                assert "valid" in result
+
+    try:
+        # Mock get_db_context 为返回 test_db 的上下文管理器
+        @contextmanager
+        def mock_db_context():
+            yield test_db
+
+        with patch('src.modules.premium.security.get_db_context', mock_db_context):
+            with patch('src.modules.premium.security.get_db', return_value=test_db):
+                with patch('src.modules.premium.security.close_db'):
+                    service = PremiumSecurityService()
+
+                    # 测试黑名单功能
+                    user_id = 123456
+                    await service.add_to_blacklist(user_id, "测试")
+                    assert service.is_blacklisted(user_id)
+
+                    # 测试用户限额检查
+                    result = await service.check_user_limits(999999)
+                    assert result["allowed"] is True
+
+                    # 测试订单验证
+                    result = await service.validate_order(
+                        user_id=888888,
+                        premium_months=3
+                    )
+                    assert "valid" in result
+    finally:
+        test_db.close()
+        engine.dispose()
 
 
 if __name__ == "__main__":

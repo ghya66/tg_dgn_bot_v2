@@ -20,6 +20,7 @@ def test_db():
     db = SessionLocal()
     yield db
     db.close()
+    engine.dispose()
 
 
 @pytest.fixture

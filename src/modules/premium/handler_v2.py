@@ -269,16 +269,16 @@ class PremiumHandlerV2:
             )
             return ENTERING_USERNAME
         
-        # 验证用户是否存在
-        result = await self.verification_service.verify_user_exists(username)
-        
+        # 验证用户是否存在（传递 bot 实例以支持 Telegram API 验证）
+        result = await self.verification_service.verify_user_exists(username, bot=context.bot)
+
         context.user_data['recipient_username'] = username
-        
-        if result['exists'] and result['is_verified']:
-            # 用户已验证
+
+        if result['exists']:
+            # 用户存在（本地已验证 或 Telegram API 验证通过）
             context.user_data['recipient_id'] = result['user_id']
-            context.user_data['recipient_nickname'] = result['nickname']
-            
+            context.user_data['recipient_nickname'] = result['nickname'] or username
+
             keyboard = [
                 [
                     InlineKeyboardButton("✅ 确认", callback_data="confirm_user"),
@@ -286,19 +286,20 @@ class PremiumHandlerV2:
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
+            nickname = result['nickname'] or username
             await update.message.reply_text(
                 f"✅ *找到用户*\n\n"
                 f"用户名：@{username}\n"
-                f"昵称：{result['nickname']}\n\n"
+                f"昵称：{nickname}\n\n"
                 f"确认为此用户开通 Premium？",
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
             )
-            
+
             return VERIFYING_USERNAME
         else:
-            # 用户不存在或未验证
+            # 用户不存在
             keyboard = [
                 [
                     InlineKeyboardButton("🔄 重新输入", callback_data="retry_username_action"),
@@ -306,26 +307,34 @@ class PremiumHandlerV2:
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            msg = f"⚠️ *用户 @{username} "
-            if not result['exists']:
-                msg += "未找到*\n\n"
+
+            # 检查是否有具体错误信息
+            error_msg = result.get('error')
+            if error_msg:
+                # 使用 Telegram API 返回的错误信息
+                msg = f"❌ *该用户名不存在或无效*\n\n"
+                msg += f"输入的用户名：@{username}\n\n"
+                msg += "请检查用户名是否正确后重新输入。"
+            elif result.get('binding_url'):
+                # 回退模式：需要先交互
+                msg = f"⚠️ *用户 @{username} 未找到*\n\n"
                 msg += "可能原因：\n"
                 msg += "• 用户名输入错误\n"
                 msg += "• 用户未与本Bot交互过\n\n"
                 msg += "请让对方先点击以下链接与Bot交互：\n"
                 msg += f"{result['binding_url']}"
             else:
-                msg += "未验证*\n\n"
-                msg += "请让对方先与Bot交互进行验证"
-            
+                msg = f"❌ *该用户名不存在或无效*\n\n"
+                msg += f"输入的用户名：@{username}\n\n"
+                msg += "请检查用户名是否正确后重新输入。"
+
             await update.message.reply_text(
                 msg,
                 reply_markup=reply_markup,
                 parse_mode='Markdown',
                 disable_web_page_preview=True
             )
-            
+
             # 返回等待动作状态，而不是文本输入状态
             return AWAITING_USERNAME_ACTION
     

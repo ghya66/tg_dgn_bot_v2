@@ -71,11 +71,12 @@ class AddressQueryModule(BaseModule):
             },
             fallbacks=[
                 CallbackQueryHandler(self.cancel, pattern="^addrq_cancel$"),
-                # addrq_back_to_main 由 MainMenuModule 统一处理，避免冲突
+                # nav_back_to_main 由 NavigationManager 统一处理
                 CommandHandler("cancel", self.cancel),
             ],
             name="address_query_conversation",
             allow_reentry=True,
+            conversation_timeout=600,  # 10分钟超时
         )
         
         return [conv_handler]
@@ -98,7 +99,7 @@ class AddressQueryModule(BaseModule):
                 remaining_minutes=remaining_minutes
             )
             
-            keyboard = [[InlineKeyboardButton("🔙 返回", callback_data="addrq_back_to_main")]]
+            keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             # 兼容不同入口
@@ -171,7 +172,7 @@ class AddressQueryModule(BaseModule):
                 text = AddressQueryMessages.RATE_LIMIT.format(
                     remaining_minutes=remaining_minutes
                 )
-                keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="addrq_back_to_main")]]
+                keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await update.message.reply_text(
                     text,
@@ -235,7 +236,7 @@ class AddressQueryModule(BaseModule):
                     InlineKeyboardButton("🔗 链上查询详情", url=links["overview"]),
                     InlineKeyboardButton("🔍 查询转账记录", url=links["txs"])
                 ],
-                [InlineKeyboardButton("🔙 返回主菜单", callback_data="addrq_back_to_main")]
+                [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -265,7 +266,7 @@ class AddressQueryModule(BaseModule):
             
             # 发送错误提示
             text = AddressQueryMessages.QUERY_ERROR
-            keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="addrq_back_to_main")]]
+            keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             try:

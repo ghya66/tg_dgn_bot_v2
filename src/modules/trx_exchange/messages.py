@@ -5,7 +5,7 @@ TRX兑换消息模板
 class TRXExchangeMessages:
     """TRX兑换消息模板"""
     
-    WELCOME = """<b>TRX 闪兑</b>
+    WELCOME = """💱 <b>TRX 闪兑</b>
 
 24小时自动兑换，安全快捷！
 

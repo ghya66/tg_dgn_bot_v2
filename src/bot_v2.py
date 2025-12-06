@@ -323,15 +323,15 @@ class TelegramBotV2:
             replace_existing=True
         )
         
-        # USDT汇率刷新（每5分钟）
+        # USDT汇率刷新（每12小时）
         # refresh_usdt_rates_job需要context参数，创建一个包装函数
         async def refresh_rates_wrapper():
             await refresh_usdt_rates_job(None)
-        
+
         self.scheduler.add_job(
             refresh_rates_wrapper,
             'interval',
-            minutes=5,
+            hours=12,  # 每12小时刷新一次
             id='refresh_usdt_rates',
             replace_existing=True
         )

@@ -4,7 +4,7 @@
 
 import logging
 from typing import List
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes,
     BaseHandler,
@@ -68,12 +68,14 @@ class ProfileModule(BaseModule):
                 ],
                 AWAITING_DEPOSIT_AMOUNT: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, self.receive_deposit_amount),
+                    CallbackQueryHandler(self.show_profile, pattern="^profile_back$"),
                 ],
             },
             fallbacks=[
                 CommandHandler("cancel", self.cancel),
             ],
-            name="profile"
+            name="profile",
+            conversation_timeout=600,  # 10分钟超时
         )
     
     async def show_profile(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -150,12 +152,17 @@ class ProfileModule(BaseModule):
         """开始充值流程"""
         query = update.callback_query
         await query.answer()
-        
+
+        # 添加取消按钮，方便用户返回
+        keyboard = [[InlineKeyboardButton("❌ 取消", callback_data="profile_back")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
         await query.edit_message_text(
             ProfileMessages.DEPOSIT_START,
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=reply_markup
         )
-        
+
         return AWAITING_DEPOSIT_AMOUNT
     
     async def receive_deposit_amount(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

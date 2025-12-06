@@ -58,7 +58,8 @@ class HelpModule(BaseModule):
             fallbacks=[
                 CommandHandler("cancel", self.cancel),
             ],
-            name="help"
+            name="help",
+            conversation_timeout=600,  # 10分钟超时
         )
     
     async def show_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

@@ -88,13 +88,24 @@ class TestUserVerificationService:
         assert result["is_verified"] is True
     
     @pytest.mark.asyncio
-    async def test_verify_user_not_exists(self, service, test_db):
-        """测试验证不存在的用户"""
+    async def test_verify_user_format_valid_not_bound(self, service, test_db):
+        """测试验证格式有效但未绑定的用户（Plan A: 直接信任格式正确的用户名）"""
+        # "nonexistent" 是有效格式（11字符，以字母开头），Plan A 会信任它
         result = await service.verify_user_exists("nonexistent")
+        assert result["exists"] is True  # Plan A: 格式正确就信任
+        assert result["user_id"] is None  # 未绑定，没有 user_id
+        assert result["is_verified"] is False  # 未本地验证
+        assert result["nickname"] == "nonexistent"  # 使用用户名作为昵称
+
+    @pytest.mark.asyncio
+    async def test_verify_user_format_invalid(self, service, test_db):
+        """测试验证格式无效的用户名"""
+        # 使用格式无效的用户名（以数字开头，不符合 Telegram 规则）
+        result = await service.verify_user_exists("123invalid")
         assert result["exists"] is False
         assert result["user_id"] is None
         assert result["is_verified"] is False
-        assert "t.me/test_bot?start=bind_nonexistent" in result["binding_url"]
+        assert result["error"] is not None  # 应该有错误信息
     
     @pytest.mark.asyncio
     async def test_get_user_by_id(self, service, test_db, mock_user):

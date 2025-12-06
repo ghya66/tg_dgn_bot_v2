@@ -1,10 +1,14 @@
 """
 测试配置
+提供所有测试所需的 fixtures 和配置
 """
 import pytest
 import os
 import sys
-from unittest.mock import MagicMock, AsyncMock
+from datetime import datetime, timedelta
+from decimal import Decimal
+from unittest.mock import MagicMock, AsyncMock, patch
+from typing import Optional, Dict, Any
 
 # 添加src目录到Python路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -15,25 +19,29 @@ pytest_plugins = ['pytest_asyncio']
 # 设置测试环境变量
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault('BOT_TOKEN', 'test_bot_token')
+os.environ.setdefault('BOT_OWNER_ID', '123456789')
 os.environ.setdefault('USDT_TRC20_RECEIVE_ADDR', 'TTestAddress123456789012345678901234')
 os.environ.setdefault('WEBHOOK_SECRET', 'test_secret_key')
 os.environ.setdefault('REDIS_HOST', 'localhost')
 os.environ.setdefault('REDIS_PORT', '6379')
 os.environ.setdefault('REDIS_DB', '0')  # 使用 DB 0（与 REDIS_URL 一致）
 os.environ.setdefault('ORDER_TIMEOUT_MINUTES', '30')
+os.environ.setdefault('ADDRESS_QUERY_RATE_LIMIT_MINUTES', '1')
+os.environ.setdefault('ENERGY_API_USERNAME', 'test_user')
+os.environ.setdefault('ENERGY_API_PASSWORD', 'test_pass')
 
 
 @pytest.fixture
 async def redis_client():
     """提供一个已连接的 Redis 客户端
-    
+
     只有显式请求此固件的测试才会使用（通常是标记了 @pytest.mark.redis 的测试）
     """
     import redis.asyncio as redis
     import asyncio
-    
+
     client = redis.from_url(REDIS_URL, decode_responses=True, socket_timeout=3)
-    
+
     # 等待 Redis 就绪（最多 10 秒）
     redis_available = False
     for _ in range(100):
@@ -44,11 +52,11 @@ async def redis_client():
                 break
         except Exception:
             await asyncio.sleep(0.1)
-    
+
     if not redis_available:
         await client.aclose()
         pytest.skip("Redis not available, skipping Redis integration tests")
-    
+
     yield client
     await client.aclose()
 
@@ -56,12 +64,29 @@ async def redis_client():
 @pytest.fixture
 async def clean_redis(redis_client):
     """清理 Redis 数据库（需要显式请求才会执行）
-    
+
     在测试前后清理数据库，避免测试间污染
     """
     await redis_client.flushdb()
     yield
     await redis_client.flushdb()
+
+
+@pytest.fixture
+async def fake_redis():
+    """
+    提供 FakeRedis 客户端用于离线测试
+
+    不需要真实的 Redis 服务器，完全在内存中模拟
+    """
+    try:
+        import fakeredis.aioredis
+        redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+        yield redis
+        await redis.flushall()
+        await redis.aclose()
+    except ImportError:
+        pytest.skip("fakeredis not installed, skipping fake redis tests")
 
 
 @pytest.fixture
@@ -71,23 +96,153 @@ def test_db():
     from sqlalchemy.orm import sessionmaker
     from src.modules.trx_exchange.models import Base as TRXBase
     from src.modules.trx_exchange.rate_manager import Base as RateBase
-    
+
     # 创建内存数据库
     engine = create_engine("sqlite:///:memory:")
-    
+
     # 创建所有表
     TRXBase.metadata.create_all(engine)
     RateBase.metadata.create_all(engine)
-    
+
     # 创建session
     SessionLocal = sessionmaker(bind=engine)
     session = SessionLocal()
-    
+
     yield session
-    
+
     # 清理
     session.close()
     engine.dispose()
+
+
+@pytest.fixture
+def full_test_db():
+    """提供包含所有表的 SQLite 内存数据库"""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.database import Base
+    # 导入所有模型以确保它们注册到 Base.metadata
+    from src.database import (  # noqa: F401
+        User, PremiumOrder, EnergyOrder, SuffixAllocation,
+        AddressQueryLog, Order, UserBinding, DepositOrder, DebitRecord
+    )
+    from src.modules.trx_exchange.models import TRXExchangeOrder  # noqa: F401
+
+    # 创建内存数据库
+    engine = create_engine("sqlite:///:memory:", echo=False)
+
+    # 创建所有表
+    Base.metadata.create_all(engine)
+
+    # 创建 session
+    TestSession = sessionmaker(bind=engine)
+    session = TestSession()
+
+    yield session
+
+    # 清理
+    session.close()
+    Base.metadata.drop_all(engine)
+    engine.dispose()
+
+
+# ==================== Mock Telegram 对象 ====================
+
+@pytest.fixture
+def mock_user():
+    """模拟 Telegram 用户"""
+    from telegram import User
+    user = MagicMock(spec=User)
+    user.id = 123456789
+    user.username = "test_user"
+    user.first_name = "Test"
+    user.last_name = "User"
+    user.is_bot = False
+    user.language_code = "zh-hans"
+    return user
+
+
+@pytest.fixture
+def mock_admin_user():
+    """模拟管理员用户"""
+    from telegram import User
+    user = MagicMock(spec=User)
+    user.id = int(os.environ.get('BOT_OWNER_ID', '123456789'))
+    user.username = "admin_user"
+    user.first_name = "Admin"
+    user.is_bot = False
+    return user
+
+
+@pytest.fixture
+def mock_chat(mock_user):
+    """模拟 Telegram 私聊"""
+    from telegram import Chat
+    chat = MagicMock(spec=Chat)
+    chat.id = mock_user.id
+    chat.type = "private"
+    chat.username = mock_user.username
+    return chat
+
+
+@pytest.fixture
+def mock_message(mock_user, mock_chat):
+    """模拟 Telegram 消息"""
+    from telegram import Message
+    message = MagicMock(spec=Message)
+    message.message_id = 1001
+    message.date = datetime.now()
+    message.chat = mock_chat
+    message.chat_id = mock_chat.id
+    message.from_user = mock_user
+    message.text = "/start"
+    message.reply_text = AsyncMock()
+    message.reply_html = AsyncMock()
+    message.edit_text = AsyncMock()
+    message.delete = AsyncMock()
+    return message
+
+
+@pytest.fixture
+def mock_callback_query(mock_user, mock_message):
+    """模拟回调查询（按钮点击）"""
+    from telegram import CallbackQuery
+    callback = MagicMock(spec=CallbackQuery)
+    callback.id = "callback_123"
+    callback.from_user = mock_user
+    callback.message = mock_message
+    callback.data = "menu_premium"
+    callback.answer = AsyncMock()
+    callback.edit_message_text = AsyncMock()
+    callback.edit_message_reply_markup = AsyncMock()
+    return callback
+
+
+@pytest.fixture
+def mock_update(mock_message, mock_callback_query):
+    """模拟完整的 Update 对象"""
+    from telegram import Update
+    update = MagicMock(spec=Update)
+    update.update_id = 1
+    update.effective_user = mock_message.from_user
+    update.effective_chat = mock_message.chat
+    update.message = mock_message
+    update.callback_query = mock_callback_query
+    return update
+
+
+@pytest.fixture
+def mock_context():
+    """模拟 Context 对象"""
+    context = MagicMock()
+    context.bot = AsyncMock()
+    context.bot.send_message = AsyncMock()
+    context.bot.edit_message_text = AsyncMock()
+    context.bot.answer_callback_query = AsyncMock()
+    context.user_data = {}
+    context.chat_data = {}
+    context.bot_data = {}
+    return context
 
 
 def build_test_app_v2():

@@ -4,6 +4,39 @@
 
 ---
 
+## [2025-12-06] 功能优化与数据库修复
+
+### 概述
+
+完成 Premium 模块优化、实时汇率显示优化和数据库字段修复。
+
+### ✅ Premium 模块 - 方案A 实现
+
+- **修改**: 实现直接信任用户名格式（不通过 Telegram API 验证）
+- **原因**: Telegram Bot API 的 `get_chat()` 只能查询已与 Bot 交互过的用户
+- **安全性**: 发货时如果用户名无效会失败，有完善的失败处理和通知机制
+- **文件**: `src/modules/premium/user_verification.py`
+
+### ✅ 实时汇率显示优化
+
+- **新格式**: TOP10 商家列表，带排名 emoji（🥇🥈🥉4️⃣5️⃣6️⃣7️⃣8️⃣9️⃣🔟）
+- **渠道切换**: 支持"所有/银行卡/支付宝/微信"切换按钮
+- **刷新频率**: 从每5分钟改为每12小时
+- **新增方法**:
+  - `_build_rates_text()` - 构建汇率文本
+  - `_build_rates_keyboard()` - 构建渠道切换键盘
+  - `handle_rate_channel()` - 处理渠道切换
+  - `handle_rate_close()` - 处理关闭操作
+- **文件**: `src/modules/menu/handler.py`, `src/bot_v2.py`
+
+### ✅ 数据库字段修复
+
+- **energy_orders 表**: 添加 `expires_at` 字段（订单过期时间）
+- **trx_exchange_orders 表**: 添加 `send_tx_hash` 字段（Bot发送TRX交易哈希）
+- **文件**: `src/database.py`
+
+---
+
 ## [2025-11-30] 代码审查修复
 
 ### 概述

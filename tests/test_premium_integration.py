@@ -180,18 +180,165 @@ class TestPremiumValidation:
         print("✅ 用户名验证测试通过")
 
 
+class TestPremiumEdgeCases:
+    """Premium 边界条件测试"""
+
+    @pytest.fixture
+    async def helper(self, bot_app_v2):
+        """基于 bot_app_v2 创建测试辅助类"""
+        helper = BotTestHelper(bot_app_v2)
+        await helper.initialize()
+        yield helper
+
+    @pytest.mark.asyncio
+    async def test_premium_packages_all_durations(self, helper):
+        """测试所有套餐时长选择（3/6/12个月）"""
+        packages = ["premium_3", "premium_6", "premium_12"]
+
+        for pkg in packages:
+            await helper.send_command("start")
+            await helper.click_button("menu_premium")
+            await helper.click_button("premium_self")
+            await helper.click_button(pkg)
+
+            message = helper.get_message_text()
+            assert message is not None, f"套餐 {pkg} 应有响应"
+
+    @pytest.mark.asyncio
+    async def test_premium_other_valid_username(self, helper):
+        """测试为他人开通 - 有效用户名"""
+        await helper.send_command("start")
+        await helper.click_button("menu_premium")
+        await helper.click_button("premium_other")
+
+        # 输入有效用户名（至少5个字符）
+        await helper.send_message("@valid_username")
+
+        message = helper.get_message_text()
+        assert message is not None
+
+    @pytest.mark.asyncio
+    async def test_premium_other_multiple_usernames(self, helper):
+        """测试为他人开通 - 多个用户名"""
+        await helper.send_command("start")
+        await helper.click_button("menu_premium")
+        await helper.click_button("premium_other")
+
+        # 输入多个用户名
+        await helper.send_message("@user_one @user_two")
+
+        message = helper.get_message_text()
+        assert message is not None
+
+    @pytest.mark.asyncio
+    async def test_premium_back_navigation(self, helper):
+        """测试返回导航"""
+        await helper.send_command("start")
+        await helper.click_button("menu_premium")
+        await helper.click_button("premium_self")
+
+        # 点击返回
+        await helper.click_button("premium_back_target")
+
+        message = helper.get_message_text()
+        assert message is not None
+
+
+class TestPremiumErrorHandling:
+    """Premium 错误处理测试"""
+
+    @pytest.mark.asyncio
+    async def test_invalid_username_too_short(self):
+        """测试用户名太短的情况"""
+        from src.modules.premium.recipient_parser import RecipientParser
+
+        result = RecipientParser.parse("@ab")
+        assert result == [], "太短的用户名应被拒绝"
+
+    @pytest.mark.asyncio
+    async def test_invalid_username_special_chars(self):
+        """测试用户名包含特殊字符"""
+        from src.modules.premium.recipient_parser import RecipientParser
+
+        invalid_usernames = ["@user-name", "@user.name", "@user@name"]
+        for username in invalid_usernames:
+            result = RecipientParser.parse(username)
+            assert result == [], f"包含特殊字符的用户名 {username} 应被拒绝"
+
+    @pytest.mark.asyncio
+    async def test_empty_input(self):
+        """测试空输入"""
+        from src.modules.premium.recipient_parser import RecipientParser
+
+        result = RecipientParser.parse("")
+        assert result == [], "空输入应返回空列表"
+
+    @pytest.mark.asyncio
+    async def test_duplicate_usernames_removed(self):
+        """测试重复用户名去重"""
+        from src.modules.premium.recipient_parser import RecipientParser
+
+        result = RecipientParser.parse("@alice @ALICE @Alice")
+        # 应该去重，只保留一个
+        assert len(result) <= 1, "重复用户名应被去重"
+
+
+class TestPremiumOrderCreation:
+    """Premium 订单创建测试"""
+
+    @pytest.mark.asyncio
+    async def test_order_factory_creation(self):
+        """测试订单工厂创建"""
+        from tests.factories.order_factory import PremiumOrderFactory
+
+        order = PremiumOrderFactory.create_pending(
+            buyer_id=123456789,
+            premium_months=3,
+        )
+
+        assert order is not None
+        assert order.status == "PENDING"
+        assert order.premium_months == 3
+        assert order.buyer_id == 123456789
+
+    @pytest.mark.asyncio
+    async def test_order_expired_factory(self):
+        """测试过期订单工厂"""
+        from tests.factories.order_factory import PremiumOrderFactory
+
+        order = PremiumOrderFactory.create_expired(
+            buyer_id=123456789,
+            premium_months=6,
+        )
+
+        assert order.status == "EXPIRED"
+
+    @pytest.mark.asyncio
+    async def test_order_completed_factory(self):
+        """测试完成订单工厂"""
+        from tests.factories.order_factory import PremiumOrderFactory
+
+        order = PremiumOrderFactory.create_completed(
+            buyer_id=123456789,
+            premium_months=12,
+        )
+
+        assert order.status == "COMPLETED"
+        assert order.tx_hash is not None
+
+
 @pytest.mark.asyncio
 async def test_run_ci():
     """运行所有 CI 测试"""
     print("\n" + "="*80)
     print(" Premium 功能 CI 测试套件 ".center(80, "="))
     print("="*80)
-    
+
     # 运行验证测试
     validator = TestPremiumValidation()
     await validator.test_recipient_parser()
     await validator.test_username_validation()
-    
+
     print("\n" + "-"*80)
     print(" 所有测试通过 ✅ ".center(80))
     print("-"*80)

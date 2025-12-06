@@ -1,0 +1,31 @@
+[run]
+# 测量的源代码目录
+source = src
+# 忽略的文件
+omit =
+    */tests/*
+    */__pycache__/*
+    */migrations/*
+    */venv/*
+    */.venv/*
+
+[report]
+# 排除不需要覆盖的代码
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+
+# 精度
+precision = 2
+
+# 显示缺失的行
+show_missing = true
+
+[html]
+# HTML 报告目录
+directory = htmlcov
+

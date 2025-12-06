@@ -1,11 +1,13 @@
 """
 主菜单模块主处理器 - 标准化版本
 解决了返回主菜单重复提示的问题
+优化了实时汇率显示（支持渠道切换）
 """
 
 import logging
 import json
-from typing import List, Optional
+from datetime import datetime
+from typing import List, Optional, Dict, Any
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -68,6 +70,9 @@ class MainMenuModule(BaseModule):
             CallbackQueryHandler(self.handle_free_clone, pattern=r"^menu_clone$"),
             CallbackQueryHandler(self.handle_support, pattern=r"^menu_support$"),
             CallbackQueryHandler(self.handle_orders, pattern=r"^menu_orders$"),
+            # 汇率渠道切换处理器
+            CallbackQueryHandler(self.handle_rate_channel, pattern=r"^rate_channel_"),
+            CallbackQueryHandler(self.handle_rate_close, pattern=r"^rate_close$"),
             # 底部键盘按钮处理器
             MessageHandler(filters.Regex(r"^💱 实时汇率$"), self.show_rates),
             MessageHandler(filters.Regex(r"^🎁 免费克隆$"), self.show_clone_message),
@@ -319,68 +324,176 @@ class MainMenuModule(BaseModule):
             reply_markup=reply_markup
         )
     
+    def _build_rates_text(self, rates_data: Dict[str, Any], channel: str = "all") -> str:
+        """
+        构建汇率显示文本
+
+        Args:
+            rates_data: OKX API返回的汇率数据（fetch_usdt_cny_from_okx格式）
+            channel: 显示的渠道 (all/bank/alipay/wechat)
+
+        Returns:
+            格式化的汇率文本
+        """
+        lines = ["<b>欧意 OTC实时汇率 TOP10</b>\n"]
+
+        # 排名emoji
+        rank_emojis = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+
+        if channel == "all":
+            # 合并所有渠道，按价格排序取TOP10
+            all_merchants = []
+            for ch in ("bank", "alipay", "wechat"):
+                ch_data = rates_data.get(ch, {})
+                merchants = ch_data.get("merchants", [])
+                for m in merchants:
+                    all_merchants.append({
+                        "price": m.get("price", 0),
+                        "name": m.get("name", "商家")
+                    })
+            # 按价格排序
+            all_merchants.sort(key=lambda x: x["price"])
+            top10 = all_merchants[:10]
+        else:
+            # 显示单渠道TOP10
+            ch_data = rates_data.get(channel, {})
+            merchants = ch_data.get("merchants", [])
+            top10 = [{"price": m.get("price", 0), "name": m.get("name", "商家")} for m in merchants[:10]]
+
+        # 生成商家列表
+        for i, m in enumerate(top10):
+            emoji = rank_emojis[i] if i < len(rank_emojis) else "📍"
+            price = m.get("price", 0)
+            name = m.get("name", "商家")[:12]  # 限制商家名称长度
+            lines.append(f"{emoji} {price:.2f}  {name}")
+
+        if not top10:
+            lines.append("\n⚠️ 暂无数据")
+
+        # 添加时间戳
+        now = datetime.now()
+        lines.append(f"\n🕐 当前时间：{now.strftime('%Y-%m-%d %H:%M:%S')}")
+
+        return "\n".join(lines)
+
+    def _build_rates_keyboard(self, current_channel: str = "all") -> InlineKeyboardMarkup:
+        """
+        构建渠道切换键盘
+
+        Args:
+            current_channel: 当前选中的渠道
+
+        Returns:
+            InlineKeyboardMarkup 键盘布局
+        """
+        channels = [
+            ("all", "✅ 所有" if current_channel == "all" else "所有"),
+            ("bank", "✅ 银行卡" if current_channel == "bank" else "银行卡"),
+            ("alipay", "✅ 支付宝" if current_channel == "alipay" else "支付宝"),
+            ("wechat", "✅ 微信" if current_channel == "wechat" else "微信"),
+        ]
+
+        row = [InlineKeyboardButton(name, callback_data=f"rate_channel_{key}") for key, name in channels]
+
+        return InlineKeyboardMarkup([
+            row,
+            [InlineKeyboardButton("🚫 关闭", callback_data="rate_close")]
+        ])
+
     async def show_rates(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """
         显示实时U价（底部键盘按钮）
-        调用 rates 服务获取 OKX C2C 汇率
+        调用 rates 服务获取 OKX C2C 汇率，支持渠道切换
         """
         from src.rates.service import fetch_usdt_cny_from_okx
-        
+
         # 发送"正在获取"提示
         processing_msg = await update.message.reply_text("🔄 正在获取实时汇率...")
-        
+
         try:
             # 获取汇率数据
             channel_prices = await fetch_usdt_cny_from_okx()
-            
-            # 构建显示文本
-            lines = ["💵 <b>实时 USDT-CNY 汇率</b>\n"]
-            lines.append("数据来源: OKX C2C\n")
-            
-            for channel, data in channel_prices.items():
-                min_price = data.get("min_price")
-                merchants = data.get("merchants", [])
-                
-                channel_name = self.CHANNEL_TITLES.get(channel, channel)
-                icon = self.CHANNEL_ICONS.get(channel, "💰")
-                
-                if min_price:
-                    lines.append(f"\n{icon} <b>{channel_name}</b>")
-                    lines.append(f"最低价: <code>{min_price:.4f}</code> CNY")
-                    
-                    # 显示前几个商家
-                    if merchants:
-                        lines.append("商家报价:")
-                        for i, m in enumerate(merchants[:self.MAX_MERCHANT_ROWS]):
-                            nick = m.get("nickname", "商家")[:10]
-                            price = m.get("price", 0)
-                            lines.append(f"  {i+1}. {nick}: {price:.4f}")
-                else:
-                    lines.append(f"\n{icon} <b>{channel_name}</b>: 暂无数据")
-            
-            lines.append("\n\n⏰ 数据实时更新，仅供参考")
-            
-            text = "\n".join(lines)
-            
+
+            # 保存到 context 以便渠道切换时使用
+            context.user_data["rates_data"] = channel_prices
+
+            # 默认显示"所有"渠道
+            text = self._build_rates_text(channel_prices, "all")
+            keyboard = self._build_rates_keyboard("all")
+
         except Exception as e:
             logger.error(f"获取汇率失败: {e}", exc_info=True)
             text = "❌ <b>获取汇率失败</b>\n\n请稍后重试。"
-        
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
+            ])
+
         # 删除"正在获取"提示
         try:
             await processing_msg.delete()
         except Exception:
             pass
-        
+
         # 发送结果
-        keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
         await update.message.reply_text(
             text,
             parse_mode="HTML",
-            reply_markup=reply_markup
+            reply_markup=keyboard
         )
+
+    async def handle_rate_channel(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """处理汇率渠道切换"""
+        from src.rates.service import fetch_usdt_cny_from_okx
+
+        query = update.callback_query
+        await query.answer()
+
+        # 从 callback_data 解析渠道
+        channel = query.data.replace("rate_channel_", "")
+
+        # 尝试从 context 获取缓存的汇率数据
+        rates_data = context.user_data.get("rates_data")
+
+        if not rates_data:
+            # 如果没有缓存，重新获取
+            try:
+                rates_data = await fetch_usdt_cny_from_okx()
+                context.user_data["rates_data"] = rates_data
+            except Exception as e:
+                logger.error(f"获取汇率失败: {e}", exc_info=True)
+                await query.edit_message_text(
+                    "❌ <b>获取汇率失败</b>\n\n请稍后重试。",
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
+                    ])
+                )
+                return
+
+        # 构建显示文本和键盘
+        text = self._build_rates_text(rates_data, channel)
+        keyboard = self._build_rates_keyboard(channel)
+
+        await query.edit_message_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+
+    async def handle_rate_close(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """处理关闭汇率显示"""
+        query = update.callback_query
+        await query.answer("已关闭")
+
+        # 清理缓存的汇率数据
+        context.user_data.pop("rates_data", None)
+
+        # 删除消息
+        try:
+            await query.message.delete()
+        except Exception:
+            # 如果删除失败，显示简短消息
+            await query.edit_message_text("✅ 已关闭汇率显示")
     
     async def show_clone_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """
