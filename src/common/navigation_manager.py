@@ -161,14 +161,28 @@ class NavigationManager:
         from ..bot_admin.menus import AdminMenus
         query = update.callback_query
         if query:
-            await AdminMenus.show_main_menu(query)
-    
+            await query.edit_message_text(
+                "🔐 <b>管理员面板</b>\n\n请选择要执行的操作：",
+                reply_markup=AdminMenus.main_menu(),
+                parse_mode="HTML"
+            )
+
     @staticmethod
     async def _show_orders_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """显示订单管理菜单"""
-        # TODO: 实现订单管理菜单显示
-        # 暂时返回主菜单
-        await NavigationManager._show_main_menu(update, context)
+        from ..modules.orders.query_handler import show_orders_menu
+
+        # 确保 order_filters 已初始化
+        if 'order_filters' not in context.user_data:
+            context.user_data['order_filters'] = {
+                'order_type': None,
+                'status': None,
+                'user_id': None,
+                'page': 1,
+                'per_page': 10
+            }
+
+        await show_orders_menu(update, context)
     
     @classmethod
     def create_back_button(

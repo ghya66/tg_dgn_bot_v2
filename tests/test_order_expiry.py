@@ -2,12 +2,21 @@
 测试订单超时自动处理任务
 """
 import pytest
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch, MagicMock
 
 from src.tasks.order_expiry import OrderExpiryTask
 from src.database import Order
 from src.config import settings
+
+
+def create_mock_db_context(mock_session):
+    """创建一个返回 mock session 的上下文管理器"""
+    @contextmanager
+    def mock_context():
+        yield mock_session
+    return mock_context
 
 
 class TestOrderExpiryTask:
@@ -62,24 +71,28 @@ class TestOrderExpiryTask:
         result = task._extract_suffix_from_amount(amount)
         assert result in [123, 124]  # 允许误差
 
-    @patch('src.tasks.order_expiry.SessionLocal')
-    def test_check_and_expire_orders_no_orders(self, mock_session_local, task):
+    @pytest.mark.asyncio
+    @patch('src.tasks.order_expiry.get_db_context_manual_commit')
+    async def test_check_and_expire_orders_no_orders(self, mock_db_context, task):
         """测试没有过期订单的情况"""
         # 模拟数据库查询返回空列表
         mock_session = MagicMock()
-        mock_session_local.return_value = mock_session
+        mock_db_context.return_value = create_mock_db_context(mock_session)()
         mock_session.execute.return_value.scalars.return_value.all.return_value = []
-        
-        stats = task.check_and_expire_orders()
-        
+
+        stats = await task.check_and_expire_orders()
+
         assert stats["checked"] == 0
         assert stats["expired"] == 0
         assert stats["suffix_released"] == 0
         assert stats["errors"] == 0
 
-    @patch('src.tasks.order_expiry.SessionLocal')
-    def test_check_and_expire_orders_with_premium_order(self, mock_session_local, task):
+    @pytest.mark.asyncio
+    @patch('src.tasks.order_expiry.get_db_context_manual_commit')
+    async def test_check_and_expire_orders_with_premium_order(self, mock_db_context, task):
         """测试处理 Premium 过期订单"""
+        from unittest.mock import AsyncMock
+
         # 创建模拟的过期订单
         expired_order = Mock(spec=Order)
         expired_order.order_id = "PREM_TEST_001"
@@ -87,26 +100,29 @@ class TestOrderExpiryTask:
         expired_order.status = "PENDING"
         expired_order.amount_usdt = 10_123_000  # 10.123 USDT
         expired_order.created_at = datetime.now() - timedelta(hours=1)
-        
+        expired_order.user_id = 123456789
+
         # 模拟数据库
         mock_session = MagicMock()
-        mock_session_local.return_value = mock_session
+        mock_db_context.return_value = create_mock_db_context(mock_session)()
         mock_session.execute.return_value.scalars.return_value.all.return_value = [expired_order]
-        
-        # 模拟后缀释放
-        with patch.object(task.suffix_manager, 'release_suffix', return_value=True):
-            stats = task.check_and_expire_orders()
-        
+
+        # 模拟后缀释放（异步）
+        task.suffix_manager.release_suffix = AsyncMock(return_value=True)
+
+        stats = await task.check_and_expire_orders()
+
         assert stats["checked"] == 1
         assert stats["expired"] == 1
         assert stats["suffix_released"] == 1
         assert stats["errors"] == 0
-        
+
         # 验证订单状态已更新
         assert expired_order.status == "EXPIRED"
 
-    @patch('src.tasks.order_expiry.SessionLocal')
-    def test_check_and_expire_orders_with_energy_order(self, mock_session_local, task):
+    @pytest.mark.asyncio
+    @patch('src.tasks.order_expiry.get_db_context_manual_commit')
+    async def test_check_and_expire_orders_with_energy_order(self, mock_db_context, task):
         """测试处理能量订单（不需要释放后缀）"""
         # 创建模拟的能量订单
         expired_order = Mock(spec=Order)
@@ -115,22 +131,26 @@ class TestOrderExpiryTask:
         expired_order.status = "PENDING"
         expired_order.amount_usdt = 3_000_000  # 3 USDT
         expired_order.created_at = datetime.now() - timedelta(hours=1)
-        
+        expired_order.user_id = 123456789
+
         # 模拟数据库
         mock_session = MagicMock()
-        mock_session_local.return_value = mock_session
+        mock_db_context.return_value = create_mock_db_context(mock_session)()
         mock_session.execute.return_value.scalars.return_value.all.return_value = [expired_order]
-        
-        stats = task.check_and_expire_orders()
-        
+
+        stats = await task.check_and_expire_orders()
+
         assert stats["checked"] == 1
         assert stats["expired"] == 1
         assert stats["suffix_released"] == 0  # 能量订单不释放后缀
         assert stats["errors"] == 0
 
-    @patch('src.tasks.order_expiry.SessionLocal')
-    def test_check_and_expire_orders_with_multiple_orders(self, mock_session_local, task):
+    @pytest.mark.asyncio
+    @patch('src.tasks.order_expiry.get_db_context_manual_commit')
+    async def test_check_and_expire_orders_with_multiple_orders(self, mock_db_context, task):
         """测试处理多个过期订单"""
+        from unittest.mock import AsyncMock
+
         # 创建多个过期订单
         orders = []
         for i in range(3):
@@ -140,25 +160,30 @@ class TestOrderExpiryTask:
             order.status = "PENDING"
             order.amount_usdt = 10_000_000 + (i + 1) * 1000  # 10.001, 10.002, 10.003
             order.created_at = datetime.now() - timedelta(hours=1)
+            order.user_id = 123456789
             orders.append(order)
-        
+
         # 模拟数据库
         mock_session = MagicMock()
-        mock_session_local.return_value = mock_session
+        mock_db_context.return_value = create_mock_db_context(mock_session)()
         mock_session.execute.return_value.scalars.return_value.all.return_value = orders
-        
-        # 模拟后缀释放
-        with patch.object(task.suffix_manager, 'release_suffix', return_value=True):
-            stats = task.check_and_expire_orders()
-        
+
+        # 模拟后缀释放（异步）
+        task.suffix_manager.release_suffix = AsyncMock(return_value=True)
+
+        stats = await task.check_and_expire_orders()
+
         assert stats["checked"] == 3
         assert stats["expired"] == 3
         assert stats["suffix_released"] == 3
         assert stats["errors"] == 0
 
-    @patch('src.tasks.order_expiry.SessionLocal')
-    def test_check_and_expire_orders_with_error(self, mock_session_local, task):
+    @pytest.mark.asyncio
+    @patch('src.tasks.order_expiry.get_db_context_manual_commit')
+    async def test_check_and_expire_orders_with_error(self, mock_db_context, task):
         """测试处理订单时发生错误"""
+        from unittest.mock import AsyncMock
+
         # 创建会引发错误的订单
         error_order = Mock(spec=Order)
         error_order.order_id = "ERROR_TEST_001"
@@ -166,40 +191,47 @@ class TestOrderExpiryTask:
         error_order.status = "PENDING"
         error_order.amount_usdt = 10_123_000
         error_order.created_at = datetime.now() - timedelta(hours=1)
-        
+        error_order.user_id = 123456789
+
         # 模拟数据库
         mock_session = MagicMock()
-        mock_session_local.return_value = mock_session
+        mock_db_context.return_value = create_mock_db_context(mock_session)()
         mock_session.execute.return_value.scalars.return_value.all.return_value = [error_order]
-        
-        # 模拟后缀释放失败
-        with patch.object(task.suffix_manager, 'release_suffix', side_effect=Exception("Redis error")):
-            stats = task.check_and_expire_orders()
-        
+
+        # 模拟后缀释放失败（异步）
+        task.suffix_manager.release_suffix = AsyncMock(side_effect=Exception("Redis error"))
+
+        stats = await task.check_and_expire_orders()
+
         # 订单仍然应该被标记为过期（即使后缀释放失败）
         assert stats["checked"] == 1
         assert stats["expired"] == 1
         # 错误应该被捕获但不阻止流程
         assert error_order.status == "EXPIRED"
 
-    @patch('src.tasks.order_expiry.SessionLocal')
-    def test_check_and_expire_orders_suffix_release_failure(self, mock_session_local, task):
+    @pytest.mark.asyncio
+    @patch('src.tasks.order_expiry.get_db_context_manual_commit')
+    async def test_check_and_expire_orders_suffix_release_failure(self, mock_db_context, task):
         """测试后缀释放失败的情况"""
+        from unittest.mock import AsyncMock
+
         expired_order = Mock(spec=Order)
         expired_order.order_id = "PREM_TEST_001"
         expired_order.order_type = "premium"
         expired_order.status = "PENDING"
         expired_order.amount_usdt = 10_123_000
         expired_order.created_at = datetime.now() - timedelta(hours=1)
-        
+        expired_order.user_id = 123456789
+
         mock_session = MagicMock()
-        mock_session_local.return_value = mock_session
+        mock_db_context.return_value = create_mock_db_context(mock_session)()
         mock_session.execute.return_value.scalars.return_value.all.return_value = [expired_order]
-        
-        # 模拟后缀管理器抛出异常（释放失败）
-        with patch.object(task.suffix_manager, 'release_suffix', side_effect=Exception("Redis connection error")):
-            stats = task.check_and_expire_orders()
-        
+
+        # 模拟后缀管理器抛出异常（异步）
+        task.suffix_manager.release_suffix = AsyncMock(side_effect=Exception("Redis connection error"))
+
+        stats = await task.check_and_expire_orders()
+
         # 注意：在当前实现中，即使后缀释放失败，订单仍然会被标记为过期
         # 并且会继续计数（因为代码没有在异常时停止计数）
         assert stats["checked"] == 1
@@ -207,12 +239,15 @@ class TestOrderExpiryTask:
         # 由于后缀释放抛出异常，不会增加 suffix_released 计数
         # 但错误会被捕获，所以流程继续
 
-    def test_run(self, task):
+    @pytest.mark.asyncio
+    async def test_run(self, task):
         """测试 run 方法（由调度器调用）"""
-        with patch.object(task, 'check_and_expire_orders', return_value={"checked": 0, "expired": 0}):
-            result = task.run()
-            assert "checked" in result
-            assert "expired" in result
+        from unittest.mock import AsyncMock
+
+        task.check_and_expire_orders = AsyncMock(return_value={"checked": 0, "expired": 0})
+        result = await task.run()
+        assert "checked" in result
+        assert "expired" in result
 
 
 @pytest.mark.integration
@@ -235,14 +270,16 @@ class TestOrderExpiryIntegration:
         
         test_engine.dispose()
 
-    def test_full_expiry_flow(self, test_db):
+    @pytest.mark.asyncio
+    async def test_full_expiry_flow(self, test_db):
         """测试完整的订单过期流程（集成测试）"""
+        from unittest.mock import AsyncMock
         from src.database import Order
         from src.tasks.order_expiry import OrderExpiryTask
-        
+
         # 使用测试 session
         TestSessionLocal = test_db
-        
+
         # 创建测试订单
         session = TestSessionLocal()
         try:
@@ -259,7 +296,7 @@ class TestOrderExpiryIntegration:
                 expires_at=datetime.now() + timedelta(minutes=30)  # 30分钟后过期
             )
             session.add(expired_order)
-            
+
             # 创建一个未过期的订单
             valid_order = Order(
                 order_id="PREM_INTEGRATION_002",
@@ -273,27 +310,40 @@ class TestOrderExpiryIntegration:
                 expires_at=datetime.now() + timedelta(minutes=30)  # 30分钟后过期
             )
             session.add(valid_order)
-            
+
             session.commit()
-            
+
+            # 创建上下文管理器工厂，返回测试 session
+            @contextmanager
+            def test_db_context():
+                test_session = TestSessionLocal()
+                try:
+                    yield test_session
+                except Exception:
+                    test_session.rollback()
+                    raise
+                finally:
+                    test_session.close()
+
             # 执行超时检查任务，使用测试数据库
-            with patch('src.tasks.order_expiry.SessionLocal', TestSessionLocal):
+            with patch('src.tasks.order_expiry.get_db_context_manual_commit', test_db_context):
                 task = OrderExpiryTask()
-                with patch.object(task.suffix_manager, 'release_suffix', return_value=True):
-                    stats = task.check_and_expire_orders()
-            
+                # 使用 AsyncMock 模拟异步方法
+                task.suffix_manager.release_suffix = AsyncMock(return_value=True)
+                stats = await task.check_and_expire_orders()
+
             # 验证结果
             assert stats["checked"] == 1  # 只有1个过期
             assert stats["expired"] == 1
-            
+
             # 重新查询订单（避免 SQLAlchemy 对象比较问题）
             session.expire_all()
             expired_order = session.query(Order).filter_by(order_id="PREM_INTEGRATION_001").first()
             valid_order = session.query(Order).filter_by(order_id="PREM_INTEGRATION_002").first()
-            
+
             # 验证订单状态
             assert expired_order.status == "EXPIRED"
             assert valid_order.status == "PENDING"  # 未过期的订单应保持原状
-            
+
         finally:
             session.close()

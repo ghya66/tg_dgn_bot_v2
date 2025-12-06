@@ -54,26 +54,28 @@ class TestTRC20Handler:
             "timestamp": int(time.time()),
             "signature": "valid_signature"
         }
-        
+
         with patch('src.webhook.trc20_handler.signature_validator') as mock_validator:
             with patch.object(handler, '_process_payment') as mock_process:
-                # 模拟签名验证成功
-                mock_validator.verify_signature.return_value = True
-                
-                # 模拟支付处理成功
-                mock_process.return_value = {
-                    "success": True,
-                    "order_id": "test_order_123"
-                }
-                
-                result = await handler.handle_webhook(payload)
-                
-                assert result["success"] is True
-                assert result["order_id"] == "test_order_123"
-                
-                # 验证调用
-                mock_validator.verify_signature.assert_called_once()
-                mock_process.assert_called_once()
+                with patch.object(handler, '_check_and_set_nonce', return_value=True) as mock_nonce:
+                    # 模拟签名验证成功
+                    mock_validator.verify_signature.return_value = True
+
+                    # 模拟支付处理成功
+                    mock_process.return_value = {
+                        "success": True,
+                        "order_id": "test_order_123"
+                    }
+
+                    result = await handler.handle_webhook(payload)
+
+                    assert result["success"] is True
+                    assert result["order_id"] == "test_order_123"
+
+                    # 验证调用
+                    mock_validator.verify_signature.assert_called_once()
+                    mock_process.assert_called_once()
+                    mock_nonce.assert_called_once()
     
     @pytest.mark.asyncio
     async def test_handle_webhook_missing_fields(self, handler):
@@ -386,16 +388,123 @@ class TestTRC20Handler:
         assert any("Invalid payment amount" in error for error in result["errors"])
     
     def test_validate_webhook_payload_old_timestamp(self, handler):
-        """测试过旧时间戳的载荷验证"""
+        """测试过旧时间戳的载荷验证（超过60秒窗口）"""
         payload = {
             "order_id": "test_order_123",
             "amount": 10.123,
             "txid": "test_tx_hash_12345",
-            "timestamp": int(time.time()) - 400,  # 400秒前（超过5分钟）
+            "timestamp": int(time.time()) - 120,  # 120秒前（超过60秒窗口）
             "signature": "valid_signature"
         }
-        
+
         result = handler.validate_webhook_payload(payload)
-        
+
         assert result["valid"] is False
-        assert any("Timestamp too old" in error for error in result["errors"])
+        assert any("Timestamp out of valid window" in error for error in result["errors"])
+
+    def test_validate_webhook_payload_future_timestamp(self, handler):
+        """测试未来时间戳的载荷验证（超过60秒窗口）"""
+        payload = {
+            "order_id": "test_order_123",
+            "amount": 10.123,
+            "txid": "test_tx_hash_12345",
+            "timestamp": int(time.time()) + 120,  # 120秒后（超过60秒窗口）
+            "signature": "valid_signature"
+        }
+
+        result = handler.validate_webhook_payload(payload)
+
+        assert result["valid"] is False
+        assert any("Timestamp out of valid window" in error for error in result["errors"])
+
+    def test_validate_webhook_payload_valid_timestamp_within_window(self, handler):
+        """测试有效时间戳（在60秒窗口内）"""
+        payload = {
+            "order_id": "test_order_123",
+            "amount": 10.123,
+            "txid": "test_tx_hash_12345",
+            "timestamp": int(time.time()) - 30,  # 30秒前（在60秒窗口内）
+            "signature": "valid_signature"
+        }
+
+        result = handler.validate_webhook_payload(payload)
+
+        assert result["valid"] is True
+
+    @pytest.mark.asyncio
+    async def test_handle_webhook_timestamp_out_of_window(self, handler):
+        """测试 handle_webhook 时间戳超出窗口"""
+        payload = {
+            "order_id": "test_order_123",
+            "amount": 10.123,
+            "txid": "test_tx_hash_12345",
+            "timestamp": int(time.time()) - 120,  # 120秒前
+            "signature": "valid_signature"
+        }
+
+        result = await handler.handle_webhook(payload)
+
+        assert result["success"] is False
+        assert "Timestamp out of valid window" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_check_and_set_nonce_new_nonce(self, handler):
+        """测试新 nonce 设置成功"""
+        with patch.object(handler, '_get_redis_client') as mock_get_redis:
+            mock_redis = AsyncMock()
+            mock_redis.set.return_value = True  # SETNX 成功
+            mock_get_redis.return_value = mock_redis
+
+            result = await handler._check_and_set_nonce("tx_hash_123", "order_123")
+
+            assert result is True
+            mock_redis.set.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_check_and_set_nonce_duplicate(self, handler):
+        """测试重复 nonce 被拒绝（防重放）"""
+        with patch.object(handler, '_get_redis_client') as mock_get_redis:
+            mock_redis = AsyncMock()
+            mock_redis.set.return_value = None  # SETNX 失败（key 已存在）
+            mock_get_redis.return_value = mock_redis
+
+            result = await handler._check_and_set_nonce("tx_hash_123", "order_123")
+
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_check_and_set_nonce_redis_failure_graceful_degradation(self, handler):
+        """测试 Redis 不可用时的降级策略"""
+        with patch.object(handler, '_get_redis_client') as mock_get_redis:
+            mock_redis = AsyncMock()
+            mock_redis.set.side_effect = Exception("Redis connection failed")
+            mock_get_redis.return_value = mock_redis
+
+            # Redis 失败时应该降级放行
+            result = await handler._check_and_set_nonce("tx_hash_123", "order_123")
+
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_handle_webhook_replay_attack_blocked(self, handler):
+        """测试重放攻击被阻止"""
+        payload = {
+            "order_id": "test_order_123",
+            "amount": 10.123,
+            "txid": "test_tx_hash_12345",
+            "timestamp": int(time.time()),
+            "signature": "valid_signature"
+        }
+
+        with patch('src.webhook.trc20_handler.signature_validator') as mock_validator:
+            with patch.object(handler, '_check_and_set_nonce') as mock_nonce:
+                # 模拟签名验证成功
+                mock_validator.verify_signature.return_value = True
+
+                # 模拟 nonce 检查失败（重复请求）
+                mock_nonce.return_value = False
+
+                result = await handler.handle_webhook(payload)
+
+                assert result["success"] is False
+                assert "Duplicate callback detected" in result["error"]

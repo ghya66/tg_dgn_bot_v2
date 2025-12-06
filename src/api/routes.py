@@ -507,6 +507,14 @@ def get_energy_api_client():
     return _energy_api_client
 
 
+async def close_energy_api_client():
+    """关闭能量 API 客户端（应用关闭时调用）"""
+    global _energy_api_client
+    if _energy_api_client is not None:
+        await _energy_api_client.close()
+        _energy_api_client = None
+
+
 class EnergyBuyRequest(BaseModel):
     """购买能量请求"""
     receive_address: str  # 接收能量的地址

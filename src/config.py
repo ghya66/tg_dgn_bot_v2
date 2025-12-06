@@ -1,7 +1,7 @@
 """
 配置管理模块
 """
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -67,7 +67,9 @@ class Settings(BaseSettings):
     # TRX兑换配置
     trx_exchange_receive_address: str = ""  # 收USDT地址
     trx_exchange_send_address: str = ""  # 发TRX地址
-    trx_exchange_private_key: str = ""  # 发TRX私钥（生产环境填写）
+    # 使用 SecretStr 保护私钥，防止意外打印到日志
+    # 访问时需要调用 .get_secret_value() 方法
+    trx_exchange_private_key: SecretStr = SecretStr("")  # 发TRX私钥（生产环境填写）
     trx_exchange_qrcode_file_id: str = ""  # 收款二维码 Telegram file_id
     trx_exchange_default_rate: float = 3.05  # 默认汇率（1 USDT = X TRX）
     trx_exchange_test_mode: bool = True  # 测试模式（不实际转账）

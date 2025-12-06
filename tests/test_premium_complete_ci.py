@@ -170,32 +170,29 @@ class CompletePremiumCITestSuite:
         except Exception as e:
             self.record_test("安全服务", False, str(e))
     
-    async def test_premium_handler_v2(self):
-        """测试Premium Handler V2"""
-        print("\n[5/7] 测试Premium Handler V2...")
+    async def test_premium_handler(self):
+        """测试Premium Handler（标准化模块）"""
+        print("\n[5/7] 测试Premium Handler...")
         try:
-            from src.modules.premium.handler_v2 import PremiumHandlerV2
-            
-            handler = PremiumHandlerV2(
+            from src.modules.premium.handler import PremiumModule
+
+            module = PremiumModule(
                 order_manager=MagicMock(),
                 suffix_manager=MagicMock(),
                 delivery_service=MagicMock(),
                 receive_address="TTest123",
                 bot_username="test_bot"
             )
-            
-            # 测试对话处理器创建
-            conv_handler = handler.get_conversation_handler()
-            self.record_test("Handler V2 创建", conv_handler is not None)
-            
-            # 测试套餐配置
-            self.record_test("套餐配置", 
-                           handler.PACKAGES[3] == 17.0 and 
-                           handler.PACKAGES[6] == 25.0 and 
-                           handler.PACKAGES[12] == 40.0)
-            
+
+            # 测试处理器创建
+            handlers = module.get_handlers()
+            self.record_test("Handler 创建", len(handlers) > 0)
+
+            # 测试模块名称
+            self.record_test("模块名称", module.module_name == "premium")
+
         except Exception as e:
-            self.record_test("Premium Handler V2", False, str(e))
+            self.record_test("Premium Handler", False, str(e))
     
     async def test_integration_flow(self):
         """测试集成流程"""

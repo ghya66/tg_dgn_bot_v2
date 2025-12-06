@@ -3,11 +3,12 @@
 
 定期检查数据库中的 PENDING 订单，自动将超时订单标记为 EXPIRED，
 并释放占用的 Redis 后缀（如果适用）。
+
+注意：此模块使用异步方法，与 AsyncIOScheduler 兼容。
 """
-import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import List, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from telegram import Bot
@@ -15,9 +16,10 @@ if TYPE_CHECKING:
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..database import SessionLocal, Order
+from ..database import Order
 from ..payments.suffix_manager import SuffixManager
 from src.common.settings_service import get_order_timeout_minutes
+from src.common.db_manager import get_db_context_manual_commit
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +32,13 @@ class OrderExpiryTask:
         self.suffix_manager = SuffixManager()
         self._bot: Optional["Bot"] = None
         logger.info("订单超时处理任务初始化完成")
-    
+
     def set_bot(self, bot: "Bot") -> None:
         """设置 Bot 实例用于发送通知"""
         self._bot = bot
         logger.info("订单超时任务已绑定 Bot 实例")
 
-    def check_and_expire_orders(self) -> dict:
+    async def check_and_expire_orders(self) -> dict:
         """
         检查并处理过期订单
 
@@ -52,7 +54,6 @@ class OrderExpiryTask:
         timeout_minutes = get_order_timeout_minutes()
         logger.info("订单超时检查任务：本次使用超时时间 %s 分钟", timeout_minutes)
 
-        session = SessionLocal()
         stats = {
             "checked": 0,
             "expired": 0,
@@ -60,57 +61,56 @@ class OrderExpiryTask:
             "errors": 0
         }
 
-        try:
-            # 计算超时时间点
-            timeout_time = datetime.now() - timedelta(minutes=timeout_minutes)
-            
-            # 查询所有超时的 PENDING 订单
-            stmt = select(Order).where(
-                Order.status == "PENDING",
-                Order.created_at < timeout_time
-            )
-            expired_orders = session.execute(stmt).scalars().all()
-            
-            stats["checked"] = len(expired_orders)
-            
-            if not expired_orders:
-                logger.debug("没有发现过期订单")
-                return stats
+        # 使用手动提交的上下文管理器，确保连接正确关闭
+        with get_db_context_manual_commit() as session:
+            try:
+                # 计算超时时间点
+                timeout_time = datetime.now() - timedelta(minutes=timeout_minutes)
 
-            logger.info(f"发现 {len(expired_orders)} 个过期订单，开始处理...")
+                # 查询所有超时的 PENDING 订单
+                stmt = select(Order).where(
+                    Order.status == "PENDING",
+                    Order.created_at < timeout_time
+                )
+                expired_orders = session.execute(stmt).scalars().all()
 
-            # 处理每个过期订单
-            for order in expired_orders:
-                try:
-                    self._expire_single_order(session, order, stats)
-                except Exception as e:
-                    logger.error(f"处理订单 {order.order_id} 失败: {e}", exc_info=True)
-                    stats["errors"] += 1
+                stats["checked"] = len(expired_orders)
 
-            # 提交所有更改
-            session.commit()
-            
-            logger.info(
-                f"订单超时处理完成 - "
-                f"检查: {stats['checked']}, "
-                f"已过期: {stats['expired']}, "
-                f"释放后缀: {stats['suffix_released']}, "
-                f"错误: {stats['errors']}"
-            )
+                if not expired_orders:
+                    logger.debug("没有发现过期订单")
+                    return stats
 
-        except Exception as e:
-            logger.error(f"订单超时检查任务失败: {e}", exc_info=True)
-            session.rollback()
-            stats["errors"] += 1
+                logger.info(f"发现 {len(expired_orders)} 个过期订单，开始处理...")
 
-        finally:
-            session.close()
+                # 处理每个过期订单
+                for order in expired_orders:
+                    try:
+                        await self._expire_single_order(session, order, stats)
+                    except Exception as e:
+                        logger.error(f"处理订单 {order.order_id} 失败: {e}", exc_info=True)
+                        stats["errors"] += 1
+
+                # 提交所有更改
+                session.commit()
+
+                logger.info(
+                    f"订单超时处理完成 - "
+                    f"检查: {stats['checked']}, "
+                    f"已过期: {stats['expired']}, "
+                    f"释放后缀: {stats['suffix_released']}, "
+                    f"错误: {stats['errors']}"
+                )
+
+            except Exception as e:
+                logger.error(f"订单超时检查任务失败: {e}", exc_info=True)
+                session.rollback()
+                stats["errors"] += 1
 
         return stats
 
-    def _expire_single_order(self, session: Session, order: Order, stats: dict):
+    async def _expire_single_order(self, session: Session, order: Order, stats: dict):
         """
-        处理单个过期订单
+        处理单个过期订单（异步方法）
 
         Args:
             session: 数据库会话
@@ -119,16 +119,16 @@ class OrderExpiryTask:
         """
         order_id = order.order_id
         order_type = order.order_type
-        
+
         # 更新订单状态
         order.status = "EXPIRED"
-        
+
         logger.info(
             f"订单 {order_id} 已过期 "
             f"(类型: {order_type}, "
             f"创建时间: {order.created_at.strftime('%Y-%m-%d %H:%M:%S')})"
         )
-        
+
         stats["expired"] += 1
 
         # 释放 Redis 后缀（仅适用于使用3位小数后缀的订单类型）
@@ -136,22 +136,21 @@ class OrderExpiryTask:
             try:
                 # 从订单金额中提取后缀
                 suffix = self._extract_suffix_from_amount(order.amount_usdt)
-                
+
                 if suffix:
-                    released = asyncio.run(
-                        self.suffix_manager.release_suffix(suffix, order_id)
-                    )
+                    # 使用 await 替代 asyncio.run()，避免嵌套事件循环
+                    released = await self.suffix_manager.release_suffix(suffix, order_id)
                     if released:
                         logger.info(f"释放后缀 {suffix} (订单: {order_id})")
                         stats["suffix_released"] += 1
                     else:
                         logger.warning(f"无法释放后缀 {suffix} (订单: {order_id})")
-                        
+
             except Exception as e:
                 logger.error(f"释放后缀失败 (订单: {order_id}): {e}")
-        
+
         # 通知用户订单已过期
-        self._notify_user_order_expired(order, stats)
+        await self._notify_user_order_expired(order, stats)
 
     def _should_release_suffix(self, order_type: str) -> bool:
         """
@@ -196,10 +195,10 @@ class OrderExpiryTask:
             logger.error(f"提取后缀失败 (金额: {amount_micro_usdt}): {e}")
             return None
 
-    def _notify_user_order_expired(self, order: Order, stats: dict):
+    async def _notify_user_order_expired(self, order: Order, stats: dict):
         """
-        通知用户订单已过期
-        
+        通知用户订单已过期（异步方法）
+
         Args:
             order: 订单对象
             stats: 统计字典
@@ -207,11 +206,11 @@ class OrderExpiryTask:
         if not self._bot:
             logger.debug("未设置 Bot 实例，跳过用户通知")
             return
-        
+
         user_id = order.user_id
         order_id = order.order_id
         order_type = order.order_type
-        
+
         # 构建通知消息
         order_type_names = {
             "premium": "Premium会员",
@@ -220,7 +219,7 @@ class OrderExpiryTask:
             "energy": "能量服务"
         }
         type_name = order_type_names.get(order_type, order_type)
-        
+
         message = (
             f"⏰ <b>订单已过期</b>\n\n"
             f"订单号: <code>{order_id}</code>\n"
@@ -228,15 +227,13 @@ class OrderExpiryTask:
             f"订单因超时未支付已自动取消。\n"
             f"如需继续，请重新发起。"
         )
-        
+
         try:
-            # 使用 asyncio.run 发送消息
-            asyncio.run(
-                self._bot.send_message(
-                    chat_id=user_id,
-                    text=message,
-                    parse_mode="HTML"
-                )
+            # 使用 await 替代 asyncio.run()，避免嵌套事件循环
+            await self._bot.send_message(
+                chat_id=user_id,
+                text=message,
+                parse_mode="HTML"
             )
             logger.info(f"已通知用户 {user_id} 订单 {order_id} 过期")
             stats["notified"] = stats.get("notified", 0) + 1
@@ -244,11 +241,11 @@ class OrderExpiryTask:
             # 通知失败不影响主流程
             logger.warning(f"通知用户 {user_id} 失败: {e}")
 
-    def run(self):
-        """运行任务（由调度器调用）"""
+    async def run(self):
+        """运行任务（由调度器调用，异步方法）"""
         try:
             logger.debug("开始执行订单超时检查任务...")
-            stats = self.check_and_expire_orders()
+            stats = await self.check_and_expire_orders()
             return stats
         except Exception as e:
             logger.error(f"订单超时任务执行失败: {e}", exc_info=True)

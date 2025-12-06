@@ -7,7 +7,8 @@
 - **代码清理**: 100% ✅
 - **代码审查修复**: 100% ✅ (两轮共20项)
 - **功能优化**: 100% ✅ (Premium方案A + 汇率显示优化)
-- **测试覆盖**: 68+ 核心测试通过
+- **第三阶段（稳定性）**: 100% ✅ (4项改进)
+- **测试覆盖**: 749 passed ✅
 
 ## ✅ 已完成工作
 
@@ -86,9 +87,8 @@ src/
 ## 🧪 测试状态
 
 ```
-核心测试: 68 passed ✅
-Premium测试: 19 passed ✅
-总计: 100+ 测试用例
+总计: 749 passed, 2 skipped ✅
+运行时间: ~43秒
 ```
 
 ## 📝 文档
@@ -104,12 +104,49 @@ Premium测试: 19 passed ✅
 
 | 日期 | 更新内容 |
 |------|---------|
+| 2025-12-06 | 第三阶段（稳定性）：数据库会话管理统一、错误收集器持久化、Energy API 连接泄漏修复、结构化日志 |
 | 2025-12-06 | Premium 方案A（直接信任用户名格式）、汇率显示优化（渠道切换、12小时刷新）、数据库字段修复 |
 | 2025-12-05 | 完成第二轮代码审查修复（10项） |
 | 2025-11-30 | 完成第一轮代码审查修复（10项） |
 | 2025-11-26 | 完成模块标准化和代码清理 |
 
 ## 🆕 最新更新 (2025-12-06)
+
+### 第三阶段（稳定性）改进
+
+#### P1-1: 统一数据库会话管理
+- ✅ `trc20_handler.py` 的 `get_db()/close_db()` 改为 `get_db_context()` 上下文管理器
+- ✅ 消除连接泄漏风险
+
+#### P1-4: 错误收集器持久化
+- ✅ 启动时自动加载历史数据
+- ✅ 异步落盘（`ThreadPoolExecutor`）
+- ✅ 进程退出时自动保存（`atexit` hook）
+- ✅ 线程安全保护
+
+#### P1-5: Energy API 连接泄漏修复
+- ✅ `EnergyAPIClient` 支持 `async with` 上下文管理器
+- ✅ 延迟创建 `httpx.AsyncClient`
+- ✅ FastAPI `lifespan` 统一管理资源清理
+
+#### P1-6: 结构化日志格式
+- ✅ 新建 `src/common/logging_config.py`
+- ✅ 支持 JSON/人类可读格式
+- ✅ `trace_id` 关联同一请求的日志
+- ✅ 环境变量配置：`LOG_FORMAT`、`LOG_LEVEL`、`LOG_FILE`
+
+### 日志配置使用
+
+```bash
+# 开发环境（人类可读格式）
+python src/bot_v2.py
+
+# 生产环境（JSON 格式）
+LOG_FORMAT=json LOG_LEVEL=INFO python src/bot_v2.py
+
+# 输出到文件
+LOG_FILE=logs/bot.log python src/bot_v2.py
+```
 
 ### Premium 模块优化
 - ✅ 实现方案A：直接信任用户名格式（不通过 Telegram API 验证）

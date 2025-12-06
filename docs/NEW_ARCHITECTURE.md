@@ -357,6 +357,28 @@ tail -f logs/bot.log
 tail -f logs/api.log
 ```
 
+### 结构化日志配置（v2.3.0+）
+
+Bot 支持结构化日志，通过环境变量配置：
+
+```bash
+# 开发环境（人类可读格式）
+python src/bot_v2.py
+
+# 生产环境（JSON 格式，便于日志分析）
+LOG_FORMAT=json LOG_LEVEL=INFO python src/bot_v2.py
+
+# 输出到文件
+LOG_FILE=logs/bot.log python src/bot_v2.py
+```
+
+**JSON 格式示例**:
+```json
+{"timestamp": "2025-12-06T08:33:04.037Z", "level": "INFO", "logger": "src.api", "message": "API Request: GET /api/health", "trace_id": "abc123", "module": "middleware"}
+```
+
+**trace_id 关联**: 同一请求的所有日志共享相同的 `trace_id`，便于追踪问题。
+
 ### 性能监控
 
 - CPU使用率: `< 20%`
@@ -415,6 +437,14 @@ order, error = energy_service.create_order(
 ---
 
 ## 更新日志
+
+### v2.3.0 (2025-12-06)
+- 🔧 统一数据库会话管理（`get_db_context()` 上下文管理器）
+- 🔧 错误收集器持久化（自动加载/保存、线程安全）
+- 🔧 修复 Energy API 客户端连接泄漏
+- ✨ 新增结构化日志（JSON/人类可读格式、trace_id）
+- 🔧 FastAPI 使用 lifespan 统一管理资源清理
+- 📝 新增 `src/common/logging_config.py` 日志配置模块
 
 ### v2.2.0 (2025-11-30)
 - 🗑️ 删除 `src/legacy/` 目录，完成标准化迁移

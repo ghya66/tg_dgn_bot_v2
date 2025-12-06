@@ -2,11 +2,20 @@
 测试 Premium 交付服务 - 自动发货模式
 """
 import pytest
+from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 from telegram import Bot, Chat
 from telegram.error import TelegramError
 from src.modules.premium.delivery import PremiumDeliveryService
 from src.payments.order import order_manager
+
+
+def create_mock_db_context(mock_db):
+    """创建一个返回 mock db 的上下文管理器"""
+    @contextmanager
+    def mock_context():
+        yield mock_db
+    return mock_context
 
 
 @pytest.fixture
@@ -107,14 +116,12 @@ async def test_deliver_premium_no_recipient_id(delivery_service, mock_bot):
     mock_transactions.transactions = [mock_tx]
     mock_bot.get_star_transactions = AsyncMock(return_value=mock_transactions)
     
-    # 使用 patch 模拟数据库操作
-    with patch('src.modules.premium.delivery.get_db') as mock_get_db, \
-         patch('src.modules.premium.delivery.close_db'):
-        mock_db = MagicMock()
-        mock_order = MagicMock()
-        mock_db.query.return_value.filter.return_value.first.return_value = mock_order
-        mock_get_db.return_value = mock_db
-        
+    # 使用 patch 模拟数据库上下文管理器
+    mock_db = MagicMock()
+    mock_order = MagicMock()
+    mock_db.query.return_value.filter.return_value.first.return_value = mock_order
+
+    with patch('src.modules.premium.delivery.get_db_context', return_value=create_mock_db_context(mock_db)()):
         result = await delivery_service.deliver_premium(
             order_id="test-order-123",
             buyer_id=999,
@@ -122,7 +129,7 @@ async def test_deliver_premium_no_recipient_id(delivery_service, mock_bot):
             recipient_id=None,  # 无 ID，需要解析
             premium_months=3
         )
-        
+
         assert result["success"] is True
         assert result["recipient_id"] == 123456
         mock_bot.gift_premium_subscription.assert_called_once()
@@ -135,14 +142,13 @@ async def test_deliver_premium_insufficient_balance(delivery_service, mock_bot):
     mock_transactions = MagicMock()
     mock_transactions.transactions = []
     mock_bot.get_star_transactions = AsyncMock(return_value=mock_transactions)
-    
-    with patch('src.modules.premium.delivery.get_db') as mock_get_db, \
-         patch('src.modules.premium.delivery.close_db'):
-        mock_db = MagicMock()
-        mock_order = MagicMock()
-        mock_db.query.return_value.filter.return_value.first.return_value = mock_order
-        mock_get_db.return_value = mock_db
-        
+
+    # 使用 patch 模拟数据库上下文管理器
+    mock_db = MagicMock()
+    mock_order = MagicMock()
+    mock_db.query.return_value.filter.return_value.first.return_value = mock_order
+
+    with patch('src.modules.premium.delivery.get_db_context', return_value=create_mock_db_context(mock_db)()):
         result = await delivery_service.deliver_premium(
             order_id="test-order-123",
             buyer_id=999,
@@ -150,6 +156,6 @@ async def test_deliver_premium_insufficient_balance(delivery_service, mock_bot):
             recipient_id=123456,
             premium_months=3
         )
-        
+
         assert result["success"] is False
         assert "余额不足" in result["message"]

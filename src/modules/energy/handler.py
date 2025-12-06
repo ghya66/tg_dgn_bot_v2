@@ -32,7 +32,8 @@ from .keyboards import EnergyKeyboards
 from .models import EnergyPackage, EnergyOrderType
 from src.modules.address_query.validator import AddressValidator
 from src.config import settings
-from src.database import SessionLocal, EnergyOrder as DBEnergyOrder
+from src.database import EnergyOrder as DBEnergyOrder
+from src.common.db_manager import get_db_context
 from src.common.settings_service import get_order_timeout_minutes
 
 logger = logging.getLogger(__name__)
@@ -445,55 +446,49 @@ class EnergyModule(BaseModule):
     async def _create_order(self, state: dict, order_id: str, timeout_minutes: int):
         """创建订单（简化版本）"""
         try:
-            db = SessionLocal()
-            
-            energy_type = state.get("energy_type")
-            receive_address = state.get("receive_address")
-            user_id = state.get("user_id", 0)  # 获取user_id
-            
-            # 创建订单记录
-            db_order = DBEnergyOrder(
-                order_id=order_id,
-                user_id=user_id,
-                order_type=energy_type,  # 使用order_type而不是energy_type
-                receive_address=receive_address,
-                status="pending",
-                created_at=datetime.now(),
-                expires_at=datetime.now() + timedelta(minutes=timeout_minutes)
-            )
-            
-            # 根据类型设置不同字段
-            if energy_type == EnergyOrderType.HOURLY.value:
-                db_order.energy_amount = state.get("energy_amount")
-                db_order.price_trx = state.get("price_trx")
-            else:
-                db_order.usdt_amount = state.get("usdt_amount")
-            
-            db.add(db_order)
-            db.commit()
-            
-            logger.info(f"创建能量订单: {order_id}")
-            
+            with get_db_context() as db:
+                energy_type = state.get("energy_type")
+                receive_address = state.get("receive_address")
+                user_id = state.get("user_id", 0)  # 获取user_id
+
+                # 创建订单记录
+                db_order = DBEnergyOrder(
+                    order_id=order_id,
+                    user_id=user_id,
+                    order_type=energy_type,  # 使用order_type而不是energy_type
+                    receive_address=receive_address,
+                    status="pending",
+                    created_at=datetime.now(),
+                    expires_at=datetime.now() + timedelta(minutes=timeout_minutes)
+                )
+
+                # 根据类型设置不同字段
+                if energy_type == EnergyOrderType.HOURLY.value:
+                    db_order.energy_amount = state.get("energy_amount")
+                    db_order.price_trx = state.get("price_trx")
+                else:
+                    db_order.usdt_amount = state.get("usdt_amount")
+
+                db.add(db_order)
+                # get_db_context 会自动 commit
+
+                logger.info(f"创建能量订单: {order_id}")
+
         except Exception as e:
             logger.error(f"创建订单失败: {e}", exc_info=True)
-            db.rollback()
-        finally:
-            db.close()
+            # get_db_context 会自动 rollback 和 close
     
     async def _save_tx_hash(self, order_id: str, tx_hash: str):
         """保存交易哈希"""
         try:
-            db = SessionLocal()
-            
-            db_order = db.query(DBEnergyOrder).filter_by(order_id=order_id).first()
-            if db_order:
-                db_order.tx_hash = tx_hash
-                db_order.updated_at = datetime.now()
-                db.commit()
-                logger.info(f"保存交易哈希: {order_id} -> {tx_hash}")
-            
+            with get_db_context() as db:
+                db_order = db.query(DBEnergyOrder).filter_by(order_id=order_id).first()
+                if db_order:
+                    db_order.tx_hash = tx_hash
+                    db_order.updated_at = datetime.now()
+                    # get_db_context 会自动 commit
+                    logger.info(f"保存交易哈希: {order_id} -> {tx_hash}")
+
         except Exception as e:
             logger.error(f"保存交易哈希失败: {e}", exc_info=True)
-            db.rollback()
-        finally:
-            db.close()
+            # get_db_context 会自动 rollback 和 close

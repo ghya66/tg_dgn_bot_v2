@@ -52,17 +52,17 @@ def get_db_context_readonly() -> Generator[Session, None, None]:
     """
     只读数据库上下文管理器
     不会自动提交事务
-    
+
     使用方法:
         with get_db_context_readonly() as db:
             # 只读查询
             users = db.query(User).all()
-    
+
     Returns:
         数据库会话（只读）
     """
     from src.database import get_db, close_db
-    
+
     db = get_db()
     try:
         yield db
@@ -70,6 +70,41 @@ def get_db_context_readonly() -> Generator[Session, None, None]:
         # 只读操作不需要提交
         if db.is_active:
             db.rollback()  # 回滚任何意外的修改
+        close_db(db)
+
+
+@contextmanager
+def get_db_context_manual_commit() -> Generator[Session, None, None]:
+    """
+    手动提交的数据库上下文管理器
+
+    用于需要在循环中处理多个操作后统一提交的场景。
+    调用者需要手动调用 db.commit()，异常时会自动回滚。
+
+    使用方法:
+        with get_db_context_manual_commit() as db:
+            for item in items:
+                # 处理每个项目
+                item.status = 'processed'
+            # 手动提交
+            db.commit()
+
+    Returns:
+        数据库会话
+    """
+    from src.database import get_db, close_db
+
+    db = get_db()
+    try:
+        yield db
+    except Exception as e:
+        # 发生异常时回滚
+        logger.error(f"Database operation failed, rolling back: {e}")
+        if db.is_active:
+            db.rollback()
+        raise
+    finally:
+        # 确保连接关闭
         close_db(db)
 
 

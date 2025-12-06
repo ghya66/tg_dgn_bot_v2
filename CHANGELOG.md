@@ -4,6 +4,107 @@
 
 ---
 
+## [2025-12-06] 第三阶段（稳定性）- 提高服务稳定性和可观测性
+
+### 概述
+
+完成第三阶段稳定性改进，修复连接泄漏、数据丢失风险，启用结构化日志格式，全面提升服务可观测性。
+
+### ✅ P1-1: 统一数据库会话管理方式
+
+- **问题**: `trc20_handler.py` 仍使用旧的 `get_db()/close_db()` 模式，存在连接泄漏风险
+- **修复**: 统一改为 `get_db_context()` 上下文管理器
+- **文件**: `src/webhook/trc20_handler.py`（第270-296行、第328-348行）
+- **测试**: 修复 `tests/test_trc20_handler.py` 和 `tests/test_trx_exchange_auto.py`
+
+### ✅ P1-4: 实现错误收集器持久化
+
+- **问题**: `ErrorCollector` 数据仅存内存，进程重启后丢失
+- **修复**:
+  - 启动时自动加载历史数据
+  - 异步落盘（使用 `ThreadPoolExecutor`）
+  - 进程退出时自动保存（`atexit` hook）
+  - 线程安全（`threading.Lock`）
+  - 自动保存间隔从 300 秒减少到 60 秒
+- **文件**: `src/common/error_collector.py`
+
+### ✅ P1-5: 修复 Energy API 客户端连接泄漏
+
+- **问题**: `EnergyAPIClient` 的 `httpx.AsyncClient` 在进程退出时未正确关闭
+- **修复**:
+  - 添加 `__aenter__/__aexit__` 支持上下文管理器
+  - 延迟创建 `httpx.AsyncClient`（避免在事件循环外创建）
+  - FastAPI 使用 `lifespan` 统一管理资源清理
+  - 移除 `middleware.py` 中重复的 `on_event("shutdown")`
+- **文件**:
+  - `src/modules/energy/client.py`
+  - `src/api/app.py`
+  - `src/api/routes.py`
+  - `src/api/middleware.py`
+
+### ✅ P1-6: 启用结构化日志格式
+
+- **新增**: `src/common/logging_config.py` 结构化日志模块
+- **功能**:
+  - 支持 JSON 格式（生产环境）和人类可读格式（开发环境）
+  - `trace_id` 关联同一请求的所有日志
+  - 环境变量配置：`LOG_FORMAT`（json/text）、`LOG_LEVEL`、`LOG_FILE`
+  - API 请求自动添加 `X-Trace-ID` 响应头
+- **文件**:
+  - `src/common/logging_config.py`（新建）
+  - `src/bot_v2.py`
+  - `src/api/middleware.py`
+
+### 📁 修改文件清单
+
+```
+src/webhook/trc20_handler.py          # P1-1: 数据库会话管理
+src/common/error_collector.py         # P1-4: 持久化改进
+src/modules/energy/client.py          # P1-5: 上下文管理器
+src/api/app.py                        # P1-5: lifespan 资源清理
+src/api/routes.py                     # P1-5: close_energy_api_client()
+src/api/middleware.py                 # P1-5: 移除重复 shutdown; P1-6: trace_id
+src/bot_v2.py                         # P1-6: 使用新日志配置
+src/common/logging_config.py          # P1-6: 新建结构化日志模块
+tests/test_trx_exchange_auto.py       # 修复测试
+tests/test_trc20_handler.py           # 修复测试
+```
+
+### 🧪 测试结果
+
+```
+749 passed, 2 skipped
+```
+
+### 使用说明
+
+#### 结构化日志配置
+
+```bash
+# 开发环境（人类可读格式）
+python src/bot_v2.py
+
+# 生产环境（JSON 格式）
+LOG_FORMAT=json LOG_LEVEL=INFO python src/bot_v2.py
+
+# 输出到文件
+LOG_FILE=logs/bot.log python src/bot_v2.py
+```
+
+#### 日志示例
+
+**人类可读格式**:
+```
+2025-12-06 16:33:04 - test - INFO - [abc123] API Request: GET /api/health
+```
+
+**JSON 格式**:
+```json
+{"timestamp": "2025-12-06T08:33:04.037173Z", "level": "INFO", "logger": "test", "message": "API Request: GET /api/health", "trace_id": "abc123", "module": "middleware", "function": "log_requests", "line": 85}
+```
+
+---
+
 ## [2025-12-06] CI/CD 兼容性修复
 
 ### 概述

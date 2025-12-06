@@ -9,7 +9,8 @@ from telegram import Bot
 from telegram.error import TelegramError
 
 from src.config import settings
-from src.database import get_db, close_db, PremiumOrder
+from src.database import PremiumOrder
+from src.common.db_manager import get_db_context
 
 logger = logging.getLogger(__name__)
 
@@ -142,8 +143,7 @@ class PremiumDeliveryService:
     
     async def _mark_delivered(self, order_id: str, recipient_id: int):
         """更新订单状态为已发货"""
-        db = get_db()
-        try:
+        with get_db_context() as db:
             order = db.query(PremiumOrder).filter(
                 PremiumOrder.order_id == order_id
             ).first()
@@ -151,24 +151,19 @@ class PremiumDeliveryService:
                 order.status = 'DELIVERED'
                 order.delivered_at = datetime.now()
                 order.recipient_id = recipient_id
-                db.commit()
-        finally:
-            close_db(db)
-    
+                # 上下文管理器会自动 commit
+
     async def _handle_failure(self, order_id: str, buyer_id: int, error_msg: str) -> Dict[str, Any]:
         """处理发货失败"""
         # 更新订单状态
-        db = get_db()
-        try:
+        with get_db_context() as db:
             order = db.query(PremiumOrder).filter(
                 PremiumOrder.order_id == order_id
             ).first()
             if order:
                 order.status = 'DELIVERY_FAILED'
                 order.fail_reason = error_msg
-                db.commit()
-        finally:
-            close_db(db)
+                # 上下文管理器会自动 commit
         
         # 通知买家
         try:

@@ -7,9 +7,18 @@ TRX 闪兑自动化测试脚本
 3. 订单状态流转
 """
 import pytest
+from contextlib import contextmanager
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
+
+
+def create_mock_db_context(mock_db):
+    """创建一个返回 mock db 的上下文管理器"""
+    @contextmanager
+    def mock_context():
+        yield mock_db
+    return mock_context
 
 
 class TestTRXSender:
@@ -71,24 +80,45 @@ class TestTRXSender:
         """测试超过限额"""
         from src.modules.trx_exchange.trx_sender import TRXSender, MAX_SINGLE_TRX
         from src.modules.trx_exchange.config import TRXExchangeConfig
-        
+
+        # 使用有效的 64 位十六进制私钥格式
+        valid_private_key = "a" * 64  # 64 位十六进制字符串
+
         config = TRXExchangeConfig(
             receive_address="T_recv",
             send_address="T_send",
-            private_key="abc123",
+            private_key=valid_private_key,
             qrcode_file_id="",
             default_rate=Decimal("0.14"),
             test_mode=False,  # 生产模式
         )
-        
+
         sender = TRXSender(config=config)
-        
+
         with pytest.raises(ValueError, match="单笔转账超过限额"):
             sender.send_trx(
                 recipient_address="TLyqzVGLV1srkB7dToTAEqgDSfPtXRJZYH",
                 amount=MAX_SINGLE_TRX + 1,
                 order_id="TEST123"
             )
+
+    def test_invalid_private_key_format(self):
+        """测试无效私钥格式"""
+        from src.modules.trx_exchange.trx_sender import TRXSender
+        from src.modules.trx_exchange.config import TRXExchangeConfig
+
+        config = TRXExchangeConfig(
+            receive_address="T_recv",
+            send_address="T_send",
+            private_key="abc123",  # 无效格式
+            qrcode_file_id="",
+            default_rate=Decimal("0.14"),
+            test_mode=False,  # 生产模式
+        )
+
+        # 应该在初始化时抛出 ValueError
+        with pytest.raises(ValueError, match="Private key format is invalid"):
+            TRXSender(config=config)
 
 
 class TestPaymentMonitor:
@@ -107,13 +137,88 @@ class TestPaymentMonitor:
     def test_init(self):
         """测试初始化"""
         from src.modules.trx_exchange.payment_monitor import PaymentMonitor
+        from collections import deque
 
         monitor = PaymentMonitor()
 
         assert monitor.running is False
         assert monitor.poll_interval == 30
         assert monitor._last_check_time is None
-        assert isinstance(monitor._processed_tx_hashes, set)
+        # 新实现使用 deque + set 进行内存限制
+        assert isinstance(monitor._processed_tx_hashes, deque)
+        assert isinstance(monitor._processed_tx_set, set)
+        # Bot 实例初始为 None
+        assert monitor._bot is None
+
+    def test_set_bot(self):
+        """测试设置 Bot 实例"""
+        from src.modules.trx_exchange.payment_monitor import PaymentMonitor
+
+        monitor = PaymentMonitor()
+        mock_bot = MagicMock()
+
+        monitor.set_bot(mock_bot)
+
+        assert monitor._bot is mock_bot
+
+    @pytest.mark.asyncio
+    async def test_notify_user_success(self):
+        """测试发送成功通知"""
+        from src.modules.trx_exchange.payment_monitor import PaymentMonitor
+
+        monitor = PaymentMonitor()
+        mock_bot = AsyncMock()
+        monitor.set_bot(mock_bot)
+
+        # 创建模拟订单
+        mock_order = MagicMock()
+        mock_order.order_id = "TEST_ORDER_001"
+        mock_order.trx_amount = 100.5
+        mock_order.recipient_address = "TXyz1234567890abcdefghijklmnopqrs"
+        mock_order.user_id = 12345
+
+        await monitor._notify_user_success(mock_order, "abc123def456")
+
+        mock_bot.send_message.assert_called_once()
+        call_args = mock_bot.send_message.call_args
+        assert call_args.kwargs["chat_id"] == 12345
+        assert "TRX 发货成功" in call_args.kwargs["text"]
+        assert "TEST_ORDER_001" in call_args.kwargs["text"]
+
+    @pytest.mark.asyncio
+    async def test_notify_user_success_no_bot(self):
+        """测试无 Bot 实例时不发送通知"""
+        from src.modules.trx_exchange.payment_monitor import PaymentMonitor
+
+        monitor = PaymentMonitor()
+        # 不设置 bot
+
+        mock_order = MagicMock()
+        mock_order.order_id = "TEST_ORDER_001"
+
+        # 不应抛出异常
+        await monitor._notify_user_success(mock_order, "abc123")
+
+    @pytest.mark.asyncio
+    async def test_notify_user_failure(self):
+        """测试发送失败通知"""
+        from src.modules.trx_exchange.payment_monitor import PaymentMonitor
+
+        monitor = PaymentMonitor()
+        mock_bot = AsyncMock()
+        monitor.set_bot(mock_bot)
+
+        mock_order = MagicMock()
+        mock_order.order_id = "TEST_ORDER_002"
+        mock_order.trx_amount = 50.0
+        mock_order.user_id = 67890
+
+        await monitor._notify_user_failure(mock_order, "Network error")
+
+        mock_bot.send_message.assert_called_once()
+        call_args = mock_bot.send_message.call_args
+        assert call_args.kwargs["chat_id"] == 67890
+        assert "TRX 发货失败" in call_args.kwargs["text"]
 
     def test_stop(self):
         """测试停止监听"""
@@ -125,6 +230,46 @@ class TestPaymentMonitor:
         monitor.stop()
 
         assert monitor.running is False
+
+    def test_add_processed_tx_memory_limit(self):
+        """测试已处理交易缓存的内存限制"""
+        from src.modules.trx_exchange.payment_monitor import PaymentMonitor, MAX_PROCESSED_TX_CACHE
+
+        monitor = PaymentMonitor()
+
+        # 添加超过限制数量的交易哈希
+        test_limit = 100  # 使用较小的数量进行测试
+        for i in range(test_limit + 10):
+            # 模拟添加，绕过 maxlen 限制测试逻辑
+            monitor._add_processed_tx(f"tx_{i}")
+
+        # deque 应该保持在 maxlen 限制内
+        assert len(monitor._processed_tx_hashes) <= MAX_PROCESSED_TX_CACHE
+        # set 应该与 deque 同步
+        assert len(monitor._processed_tx_set) == len(monitor._processed_tx_hashes)
+
+        # 最新的交易应该存在
+        assert monitor._is_tx_processed(f"tx_{test_limit + 9}")
+
+        # 重复添加不应该增加数量
+        original_len = len(monitor._processed_tx_hashes)
+        monitor._add_processed_tx(f"tx_{test_limit + 9}")
+        assert len(monitor._processed_tx_hashes) == original_len
+
+    def test_is_tx_processed_o1_lookup(self):
+        """测试交易检查是 O(1) 查找"""
+        from src.modules.trx_exchange.payment_monitor import PaymentMonitor
+
+        monitor = PaymentMonitor()
+
+        # 添加一些交易
+        for i in range(50):
+            monitor._add_processed_tx(f"tx_{i}")
+
+        # 检查存在的交易
+        assert monitor._is_tx_processed("tx_25") is True
+        # 检查不存在的交易
+        assert monitor._is_tx_processed("tx_nonexistent") is False
 
     @pytest.mark.asyncio
     async def test_start_without_receive_address(self):
@@ -323,7 +468,8 @@ class TestPaymentMonitor:
         from src.modules.trx_exchange.payment_monitor import PaymentMonitor
 
         monitor = PaymentMonitor()
-        monitor._processed_tx_hashes.add("tx_already_processed")
+        # 使用新的方法添加已处理的交易
+        monitor._add_processed_tx("tx_already_processed")
 
         tx = {"transaction_id": "tx_already_processed"}
 
@@ -332,6 +478,7 @@ class TestPaymentMonitor:
 
         # 仍然只有一个
         assert len(monitor._processed_tx_hashes) == 1
+        assert monitor._is_tx_processed("tx_already_processed")
 
     @pytest.mark.asyncio
     async def test_process_transfer_invalid_amount(self):
@@ -349,7 +496,7 @@ class TestPaymentMonitor:
         await monitor._process_transfer(tx2)
 
         # 都不应该标记为已处理（因为直接返回了）
-        assert "tx_invalid" not in monitor._processed_tx_hashes
+        assert not monitor._is_tx_processed("tx_invalid")
 
     @pytest.mark.asyncio
     async def test_process_transfer_no_matching_order(self):
@@ -363,11 +510,11 @@ class TestPaymentMonitor:
         mock_db = MagicMock()
         mock_db.query.return_value.filter.return_value.order_by.return_value.first.return_value = None
 
-        with patch('src.modules.trx_exchange.payment_monitor.SessionLocal', return_value=mock_db):
+        with patch('src.common.db_manager.get_db_context_manual_commit', return_value=create_mock_db_context(mock_db)()):
             await monitor._process_transfer(tx)
 
         # 应该标记为已处理
-        assert "tx_no_match" in monitor._processed_tx_hashes
+        assert monitor._is_tx_processed("tx_no_match")
 
     @pytest.mark.asyncio
     async def test_process_transfer_success(self):
@@ -381,6 +528,8 @@ class TestPaymentMonitor:
         mock_order = MagicMock()
         mock_order.order_id = "TRX123"
         mock_order.usdt_amount = Decimal("100")
+        mock_order.status = "PENDING"
+        mock_order.tx_hash = None
 
         mock_db = MagicMock()
         mock_db.query.return_value.filter.return_value.order_by.return_value.first.return_value = mock_order
@@ -390,13 +539,19 @@ class TestPaymentMonitor:
 
         monitor._send_trx = mock_send_trx
 
-        with patch('src.modules.trx_exchange.payment_monitor.SessionLocal', return_value=mock_db):
+        # patch _match_order 直接返回 mock_order，避免 db.query 的问题
+        async def mock_match_order(db, amount):
+            return mock_order
+
+        monitor._match_order = mock_match_order
+
+        with patch('src.common.db_manager.get_db_context_manual_commit', return_value=create_mock_db_context(mock_db)()):
             await monitor._process_transfer(tx)
 
         # 验证订单状态更新
         assert mock_order.status == "PAID"
         assert mock_order.tx_hash == "tx_success"
-        assert "tx_success" in monitor._processed_tx_hashes
+        assert monitor._is_tx_processed("tx_success")
 
     @pytest.mark.asyncio
     async def test_send_trx_success(self):

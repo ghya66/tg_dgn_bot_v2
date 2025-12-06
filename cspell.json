@@ -1,0 +1,52 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "atexit",
+    "aenter",
+    "aexit",
+    "asyncio",
+    "httpx",
+    "aiohttp",
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "sqlalchemy",
+    "loguru",
+    "apscheduler",
+    "pytest",
+    "asyncpg",
+    "aiosqlite",
+    "lifespan",
+    "contextvars",
+    "contextmanager",
+    "asynccontextmanager",
+    "dataclass",
+    "dataclasses",
+    "usdt",
+    "tron",
+    "tronscan",
+    "oklink",
+    "trxno",
+    "trxfast",
+    "orderinfo",
+    "orderid",
+    "autobuyenergy",
+    "recycleenergy"
+  ],
+  "flagWords": [],
+  "ignorePaths": [
+    "node_modules",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "*.pyc",
+    ".git",
+    "logs"
+  ],
+  "ignoreRegExpList": [
+    "T[A-Za-z0-9]{33}",
+    "[0-9a-fA-F]{64}"
+  ]
+}
+

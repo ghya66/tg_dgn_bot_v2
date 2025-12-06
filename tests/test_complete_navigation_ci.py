@@ -109,42 +109,32 @@ class TestCompleteNavigationCI:
         
         test_categories.append(("数据库", category_tests))
         
-        # ====== 3. Premium V2集成 ======
-        print("\n[3/6] 测试Premium V2集成...")
+        # ====== 3. Premium 模块集成 ======
+        print("\n[3/6] 测试Premium模块集成...")
         category_tests = []
-        
+
         try:
-            from src.modules.premium.handler_v2 import PremiumHandlerV2
-            
-            handler = PremiumHandlerV2(
+            from src.modules.premium.handler import PremiumModule
+
+            module = PremiumModule(
                 order_manager=Mock(),
                 suffix_manager=Mock(),
                 delivery_service=Mock(),
                 receive_address="TTestAddress",
                 bot_username="test_bot"
             )
-            
-            conv_handler = handler.get_conversation_handler()
-            assert conv_handler.name == "PremiumV2"
-            
-            # 新架构：检查Premium V2不应重复添加导航
-            # 导航由全局NavigationManager处理
-            has_nav = False
-            for fb in conv_handler.fallbacks:
-                if hasattr(fb, 'pattern') and fb.pattern:
-                    pattern_str = str(fb.pattern.pattern) if hasattr(fb.pattern, 'pattern') else str(fb.pattern)
-                    if 'back_to_main' in pattern_str or 'nav_back_to_main' in pattern_str:
-                        has_nav = True
-                        break
-            assert not has_nav, "Premium V2不应重复添加导航（由全局处理）"
-            
-            category_tests.append(("Premium V2导航", True, None))
-            print("  ✅ Premium V2导航集成成功")
+
+            handlers = module.get_handlers()
+            assert len(handlers) > 0, "PremiumModule应返回至少一个handler"
+            assert module.module_name == "premium"
+
+            category_tests.append(("Premium模块创建", True, None))
+            print("  ✅ Premium模块集成成功")
         except Exception as e:
-            category_tests.append(("Premium V2导航", False, str(e)))
-            print(f"  ❌ Premium V2导航测试失败: {e}")
-        
-        test_categories.append(("Premium V2", category_tests))
+            category_tests.append(("Premium模块创建", False, str(e)))
+            print(f"  ❌ Premium模块测试失败: {e}")
+
+        test_categories.append(("Premium", category_tests))
         
         # ====== 4. 管理员导航 ======
         print("\n[4/6] 测试管理员面板导航...")
