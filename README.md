@@ -201,6 +201,17 @@ tg_dgn_bot_v2/
 | `ADDRESS_QUERY_RATE_LIMIT_MINUTES` | 地址查询限频 | `1` |
 | `TRON_EXPLORER` | 区块链浏览器 | `tronscan` |
 
+### 生产环境配置
+
+| 变量 | 说明 | 建议值 |
+|------|------|--------|
+| `ENV` | 环境标识 | `prod` |
+| `LOG_LEVEL` | 日志级别 | `INFO` |
+| `LOG_FORMAT` | 日志格式（便于日志收集） | `json` |
+| `SUPPORT_CONTACT` | 客服联系方式 | `@your_support` |
+| `API_KEYS` | API 认证密钥（逗号分隔） | `key1,key2` |
+| `TRX_EXCHANGE_TEST_MODE` | TRX 发币测试模式 | `false` |
+
 ---
 
 ## 🧪 测试
@@ -262,6 +273,15 @@ pytest tests/ --cov=src --cov-report=html
 4. **确保 .env 不被提交**
    - 已在 `.gitignore` 中配置
 
+5. **生产部署检查清单**
+   - [ ] `BOT_TOKEN` - 从 @BotFather 获取的真实 Token
+   - [ ] `BOT_OWNER_ID` - 管理员的 Telegram User ID
+   - [ ] `TRX_EXCHANGE_TEST_MODE=false` - 关闭测试模式启用真实转账
+   - [ ] `TRX_EXCHANGE_PRIVATE_KEY` - TRX 发币钱包私钥
+   - [ ] `USDT_TRC20_RECEIVE_ADDR` - USDT 收款地址
+   - [ ] `WEBHOOK_SECRET` - 支付回调签名密钥
+   - [ ] 执行数据库迁移：`alembic upgrade head`
+
 ---
 
 ## 📚 文档
@@ -279,13 +299,29 @@ pytest tests/ --cov=src --cov-report=html
 
 ## 🔄 更新日志
 
-### v2.0.2 (2025-12-06)
+### v2.0.2 (2025-12-06) - 生产就绪版本 🚀
 
+**核心功能**
 - ✅ 能量订单状态同步任务：自动每5分钟从 trxfast.com 同步订单状态
 - ✅ 修复能量 API 订单查询端点：`/api/order` → `/api/orderinfo`
 - ✅ 添加订单完成/失败用户通知功能
 - ✅ 结构化日志支持（JSON/Text 格式）
 - ✅ 数据库会话管理统一化
+
+**生产部署修复**
+- ✅ 修复能量同步任务 URL 参数：`energy_sync.py` 添加 `base_url`/`backup_url` 参数传递
+- ✅ 完善 `.env.example`：添加生产环境配置项（ENV、LOG_LEVEL、SUPPORT_CONTACT、API_KEYS）
+- ✅ 添加生产环境安全检查清单
+
+**数据库迁移**
+- ✅ 新增迁移脚本 `004_user_confirmation_fields.py`
+- ✅ `energy_orders` 表：添加 `user_tx_hash`、`user_confirmed_at` 字段
+- ✅ `orders` 表：添加 `user_tx_hash`、`user_confirmed_at`、`user_confirm_source` 字段
+- ✅ `premium_orders` 表：添加 `fail_reason` 字段
+
+**测试覆盖**
+- ✅ 新增能量同步任务 URL 参数验证测试
+- ✅ 全量测试通过：758 passed, 2 skipped
 
 ### v2.0.1 (2025-12-06)
 
