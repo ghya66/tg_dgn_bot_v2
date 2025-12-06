@@ -290,10 +290,59 @@ pytest tests/ --cov=src --cov-report=html
 |------|------|
 | [QUICK_START.md](docs/QUICK_START.md) | 快速上手指南 |
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md) | 部署和测试指南 |
+| [CODE_AUDIT_GUIDE.md](docs/CODE_AUDIT_GUIDE.md) | 代码审计指南 |
 | [API_REFERENCE.md](docs/API_REFERENCE.md) | REST API 文档 |
 | [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) | 数据库结构 |
 | [ADMIN_PANEL_GUIDE.md](docs/ADMIN_PANEL_GUIDE.md) | 管理后台指南 |
 | [CODE_REVIEW_REPORT.md](docs/CODE_REVIEW_REPORT.md) | 代码审查报告 |
+
+---
+
+## 🚀 生产环境部署
+
+### 分支策略
+
+| 分支 | 用途 | 部署目标 |
+|------|------|----------|
+| `main` | 开发主分支 | 开发/测试环境 |
+| `production` | 生产稳定分支 | 生产环境 |
+| `release/x.y.z` | 发布候选分支 | 预发布测试 |
+
+### 版本标签
+
+项目使用语义化版本标签 `v{MAJOR}.{MINOR}.{PATCH}`，当前版本为 **v2.0.2**。
+
+```bash
+# 查看所有版本标签
+git tag -l "v*"
+
+# 查看特定版本详情
+git show v2.0.2
+```
+
+### 部署前检查
+
+```bash
+# 执行完整代码审计
+.\scripts\audit.ps1            # Windows
+./scripts/audit.sh             # Linux/macOS
+
+# 运行测试套件
+python -m pytest tests/ -v --tb=short
+```
+
+### Docker 部署
+
+```bash
+# 构建并启动服务
+docker-compose build --no-cache
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+```
+
+详细部署指南请参阅 [DEPLOYMENT.md](docs/DEPLOYMENT.md) 和 [CODE_AUDIT_GUIDE.md](docs/CODE_AUDIT_GUIDE.md)。
 
 ---
 
@@ -353,11 +402,29 @@ pytest tests/ --cov=src --cov-report=html
 
 欢迎提交 Issue 和 Pull Request！
 
+### 开发流程
+
 1. Fork 本仓库
 2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
 3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 提交 Pull Request
+4. 运行代码审计 (`.\scripts\audit.ps1` 或 `./scripts/audit.sh`)
+5. 推送到分支 (`git push origin feature/AmazingFeature`)
+6. 提交 Pull Request 到 `main` 分支
+
+### 发布流程
+
+```bash
+# 1. 从 main 创建发布分支
+git checkout main && git checkout -b release/x.y.z
+
+# 2. 测试通过后合并到 production
+git checkout production
+git merge release/x.y.z --no-ff
+
+# 3. 创建版本标签
+git tag -a vx.y.z -m "Release vx.y.z"
+git push origin production && git push origin vx.y.z
+```
 
 ---
 
