@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ '3.11', '3.12', '3.13' ]
+        python-version: [ '3.11', '3.12' ]  # 暂时移除 3.13，等生态完善后再添加
     services:
       redis:
         image: redis:7-alpine
@@ -65,7 +65,7 @@ jobs:
           ENERGY_API_USERNAME: "test_user"
           ENERGY_API_PASSWORD: "test_pass"
         run: |
-          python -m pytest -v --tb=short --maxfail=10 --cov=src --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml
+          python -m pytest -v --tb=short --maxfail=50 --cov=src --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
