@@ -1,0 +1,86 @@
+# render.yaml
+# Render.com Infrastructure as Code 配置
+# 文档: https://render.com/docs/infrastructure-as-code
+
+services:
+  # ========================================
+  # 主服务：Telegram Bot (Web Service)
+  # ========================================
+  - type: web
+    name: tg-dgn-bot
+    runtime: docker
+    dockerfilePath: ./Dockerfile.render
+    region: singapore  # 亚洲用户优化
+    plan: starter      # $9/月 (512MB RAM, 0.5 CPU)
+
+    # 健康检查配置
+    healthCheckPath: /health
+
+    # 自动部署设置
+    branch: deploy/render
+    autoDeploy: true
+
+    # 环境变量
+    envVars:
+      # === 运行模式 ===
+      - key: ENV
+        value: prod
+      - key: USE_WEBHOOK
+        value: "true"
+      - key: BOT_WEBHOOK_URL
+        sync: false  # 需在 Dashboard 设置: https://your-service.onrender.com/webhook
+
+      # === 服务配置 ===
+      - key: BOT_SERVICE_HOST
+        value: "0.0.0.0"
+      - key: BOT_SERVICE_PORT
+        value: "10000"
+
+      # === 日志配置 ===
+      - key: LOG_LEVEL
+        value: INFO
+      - key: LOG_FORMAT
+        value: json
+
+      # === 数据库连接（自动注入）===
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tg-bot-postgres
+          property: connectionString
+
+      # === Redis 连接（需在 Dashboard 手动设置）===
+      - key: REDIS_CONNECTION_STRING
+        sync: false
+
+      # === 敏感信息（需在 Dashboard 手动设置）===
+      - key: BOT_TOKEN
+        sync: false
+      - key: BOT_OWNER_ID
+        sync: false
+      - key: WEBHOOK_SECRET
+        sync: false
+      - key: USDT_TRC20_RECEIVE_ADDR
+        sync: false
+      - key: TRX_EXCHANGE_RECEIVE_ADDRESS
+        sync: false
+      - key: TRX_EXCHANGE_SEND_ADDRESS
+        sync: false
+      - key: TRX_EXCHANGE_PRIVATE_KEY
+        sync: false
+      - key: TRX_EXCHANGE_TEST_MODE
+        value: "false"
+      - key: ENERGY_API_USERNAME
+        sync: false
+      - key: ENERGY_API_PASSWORD
+        sync: false
+
+# ========================================
+# PostgreSQL 数据库
+# ========================================
+databases:
+  - name: tg-bot-postgres
+    plan: basic-256mb    # $6/月
+    region: singapore
+    postgresMajorVersion: "16"
+    ipAllowList: []      # 允许所有 Render 服务连接
+

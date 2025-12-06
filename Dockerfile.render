@@ -1,0 +1,46 @@
+# Dockerfile.render
+# Render.com 专用 Dockerfile
+# 与标准 Dockerfile 的区别：
+# 1. 暴露 Render 默认端口 10000
+# 2. 使用 Webhook 模式入口点 (src/render_entrypoint.py)
+# 3. 添加 PostgreSQL 客户端库
+# 4. 添加健康检查
+
+# syntax=docker/dockerfile:1
+FROM python:3.11-slim
+
+# 环境变量
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app \
+    PORT=10000
+
+WORKDIR /app
+
+# 安装系统依赖（PostgreSQL 客户端库）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 Python 依赖
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制源代码
+COPY . .
+
+# 创建数据目录（用于临时文件）
+RUN mkdir -p /app/data /app/logs
+
+# 暴露 Render 默认端口
+EXPOSE 10000
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import httpx; httpx.get('http://localhost:10000/health', timeout=5)" || exit 1
+
+# Render 专用入口点（Webhook 模式）
+CMD ["python", "-m", "src.render_entrypoint"]
+

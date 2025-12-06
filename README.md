@@ -201,6 +201,23 @@ tg_dgn_bot_v2/
 | `ADDRESS_QUERY_RATE_LIMIT_MINUTES` | 地址查询限频 | `1` |
 | `TRON_EXPLORER` | 区块链浏览器 | `tronscan` |
 
+### Render.com 部署
+
+本项目支持部署到 Render.com 平台。详细配置请参考：
+
+- 📄 [Render 部署指南](docs/RENDER_DEPLOYMENT.md)
+- 📄 [render.yaml](render.yaml) - Infrastructure as Code 配置
+
+**快速开始：**
+
+1. Fork 本仓库到您的 GitHub
+2. 在 Render Dashboard 创建新的 Blueprint
+3. 选择 `deploy/render` 分支
+4. 配置敏感环境变量（BOT_TOKEN、WEBHOOK_SECRET 等）
+5. 部署！
+
+**预估月费：** ~$25（Web Service $9 + PostgreSQL $6 + Redis $10）
+
 ### 生产环境配置
 
 | 变量 | 说明 | 建议值 |
