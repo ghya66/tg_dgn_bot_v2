@@ -341,10 +341,15 @@ def get_monitor() -> PaymentMonitor:
     return _monitor
 
 
+# 保存 asyncio task 引用，防止被 GC 回收
+_monitor_task: asyncio.Task | None = None
+
+
 async def start_payment_monitor():
     """启动支付监听（在 bot 启动时调用）"""
+    global _monitor_task
     monitor = get_monitor()
-    asyncio.create_task(monitor.start())
+    _monitor_task = asyncio.create_task(monitor.start())
 
 
 def stop_payment_monitor():

@@ -88,12 +88,12 @@ async def health_check():
 
     try:
         db_healthy = check_database_health()
-    except:
+    except Exception:
         db_healthy = False
 
     try:
         redis_healthy = order_manager.redis_client is not None
-    except:
+    except Exception:
         redis_healthy = False
 
     return HealthResponse(

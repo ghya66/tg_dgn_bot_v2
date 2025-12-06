@@ -72,7 +72,7 @@ def error_handler(func: Callable) -> Callable:
                     },
                     exception=e,
                 )
-            except:
+            except Exception:
                 pass  # 错误收集器本身出错不应影响主流程
 
             # 发送错误消息给用户
