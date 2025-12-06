@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from src.bot_admin.config_manager import config_manager
 
@@ -18,7 +17,7 @@ ORDER_TIMEOUT_KEY = "order_timeout_minutes"
 ADDRESS_COOLDOWN_KEY = "address_query_rate_limit"
 
 
-def _parse_int(value: Optional[str], *, default: int, min_value: int = 1) -> int:
+def _parse_int(value: str | None, *, default: int, min_value: int = 1) -> int:
     """Safely parse positive integers with fallback."""
 
     if value is None:
@@ -40,7 +39,7 @@ def get_order_timeout_minutes() -> int:
     return _parse_int(raw_value, default=DEFAULT_ORDER_TIMEOUT, min_value=1)
 
 
-def set_order_timeout_minutes(minutes: int, updated_by: Optional[int] = None) -> bool:
+def set_order_timeout_minutes(minutes: int, updated_by: int | None = None) -> bool:
     """Persist the new order timeout (minutes) into the settings store."""
 
     if minutes < 1:
@@ -61,7 +60,7 @@ def get_address_cooldown_minutes() -> int:
     return _parse_int(raw_value, default=DEFAULT_ADDRESS_COOLDOWN, min_value=1)
 
 
-def set_address_cooldown_minutes(minutes: int, updated_by: Optional[int] = None) -> bool:
+def set_address_cooldown_minutes(minutes: int, updated_by: int | None = None) -> bool:
     """Persist cooldown between address queries (minutes)."""
 
     if minutes < 1:

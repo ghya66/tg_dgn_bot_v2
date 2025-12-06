@@ -2,14 +2,15 @@
 
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Optional
 
 from pydantic import SecretStr
 
-from .config import TRXExchangeConfig
 from src.config import settings
+
+from .config import TRXExchangeConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +18,11 @@ logger = logging.getLogger(__name__)
 audit_logger = logging.getLogger("trx_audit")
 
 # TRX 转账限额配置
-MAX_SINGLE_TRX = Decimal("5000")    # 单笔最大 5000 TRX
-MAX_DAILY_TRX = Decimal("50000")    # 日最大 50000 TRX
+MAX_SINGLE_TRX = Decimal("5000")  # 单笔最大 5000 TRX
+MAX_DAILY_TRX = Decimal("50000")  # 日最大 50000 TRX
 
 # 私钥格式验证：64 位十六进制字符串
-PRIVATE_KEY_PATTERN = re.compile(r'^[0-9a-fA-F]{64}$')
+PRIVATE_KEY_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
 def validate_private_key_format(key: str) -> bool:
@@ -66,7 +67,7 @@ class TRXSender:
     - Private key format is validated on initialization
     """
 
-    def __init__(self, config: Optional[TRXExchangeConfig] = None):
+    def __init__(self, config: TRXExchangeConfig | None = None):
         """Initialize TRX sender."""
         if config is not None:
             self.config = config
@@ -105,14 +106,12 @@ class TRXSender:
                 logger.error("Invalid private key format detected")
                 raise ValueError("Private key format is invalid (expected 64 hex characters)")
             # 审计日志：私钥加载成功（不记录私钥本身）
-            audit_logger.info(
-                f"TRX private key loaded successfully for sender {self.sender_address}"
-            )
+            audit_logger.info(f"TRX private key loaded successfully for sender {self.sender_address}")
 
         # 生产环境配置检查
         if self.test_mode:
-            env = getattr(settings, 'env', 'dev').lower()
-            if env in ('prod', 'production'):
+            env = getattr(settings, "env", "dev").lower()
+            if env in ("prod", "production"):
                 logger.critical(
                     "⚠️ CRITICAL: TRX_EXCHANGE_TEST_MODE=True in production environment! "
                     "Real TRX transfers are DISABLED. Set TRX_EXCHANGE_TEST_MODE=False for production."
@@ -139,7 +138,7 @@ class TRXSender:
         recipient_address: str,
         amount: Decimal,
         order_id: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Send TRX to recipient address.
 
@@ -155,9 +154,7 @@ class TRXSender:
             Exception: If transfer fails (network error, insufficient balance, etc.)
         """
         if self.test_mode:
-            logger.info(
-                f"[TEST MODE] TRX Transfer: {amount} TRX → {recipient_address} (order: {order_id})"
-            )
+            logger.info(f"[TEST MODE] TRX Transfer: {amount} TRX → {recipient_address} (order: {order_id})")
             # Return mock transaction hash
             return f"mock_tx_hash_{order_id}"
 
@@ -170,7 +167,7 @@ class TRXSender:
         audit_logger.info(
             f"TRX_TRANSFER_INITIATED | order={order_id} | "
             f"sender={self.sender_address} | recipient={recipient_address} | "
-            f"amount={amount} | time={datetime.now(timezone.utc).isoformat()}"
+            f"amount={amount} | time={datetime.now(UTC).isoformat()}"
         )
 
         # Production mode: real TRX transfer using tronpy
@@ -185,9 +182,7 @@ class TRXSender:
 
             # 加载私钥（审计日志已记录）
             if not self._private_key:
-                audit_logger.warning(
-                    f"TRX_TRANSFER_FAILED | order={order_id} | reason=private_key_not_configured"
-                )
+                audit_logger.warning(f"TRX_TRANSFER_FAILED | order={order_id} | reason=private_key_not_configured")
                 raise ValueError("Private key not configured")
 
             priv_key = PrivateKey(bytes.fromhex(self._private_key))
@@ -209,7 +204,7 @@ class TRXSender:
             # 审计日志：记录成功交易
             audit_logger.info(
                 f"TRX_TRANSFER_SUCCESS | order={order_id} | tx_hash={tx_hash} | "
-                f"amount={amount} | time={datetime.now(timezone.utc).isoformat()}"
+                f"amount={amount} | time={datetime.now(UTC).isoformat()}"
             )
 
             logger.info(f"TRX transfer successful: {tx_hash} (order: {order_id})")
@@ -221,8 +216,7 @@ class TRXSender:
         except Exception as e:
             # 审计日志：记录失败交易
             audit_logger.error(
-                f"TRX_TRANSFER_FAILED | order={order_id} | "
-                f"error={str(e)[:100]} | time={datetime.now(timezone.utc).isoformat()}"
+                f"TRX_TRANSFER_FAILED | order={order_id} | error={str(e)[:100]} | time={datetime.now(UTC).isoformat()}"
             )
             logger.error(f"TRX transfer failed (order: {order_id}): {e}", exc_info=True)
             raise
@@ -242,7 +236,7 @@ class TRXSender:
             return False
 
         # Check Base58 character set
-        base58_pattern = r'^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$'
+        base58_pattern = r"^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$"
         if not re.match(base58_pattern, address):
             return False
 

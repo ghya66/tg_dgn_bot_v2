@@ -4,4 +4,5 @@
 
 from .handler import OrdersModule
 
-__all__ = ['OrdersModule']
+
+__all__ = ["OrdersModule"]

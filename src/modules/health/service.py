@@ -4,13 +4,14 @@
 提供 /health 命令：检查 Redis 与数据库可用性。
 也提供可测试的 HealthService，用于在单元测试中注入假客户端。
 """
+
 from __future__ import annotations
 
-from typing import Optional, Tuple, Callable, Dict, Any
-import asyncio
+from collections.abc import Callable
+from typing import Any
 
 from src.config import settings
-from src.database import get_db, close_db
+from src.database import close_db, get_db
 
 
 class HealthService:
@@ -22,10 +23,11 @@ class HealthService:
     def _get_redis_module(self):
         if self._redis_mod is None:
             import redis.asyncio as redis  # type: ignore
+
             self._redis_mod = redis
         return self._redis_mod
 
-    async def check_redis(self, redis_client=None) -> Tuple[bool, str]:
+    async def check_redis(self, redis_client=None) -> tuple[bool, str]:
         """检查 Redis 连接。
 
         Args:
@@ -37,13 +39,14 @@ class HealthService:
             client = redis_client
             if client is None:
                 from src.common.redis_helper import create_redis_client
+
                 client = create_redis_client(decode_responses=True)
             pong = await client.ping()
             return bool(pong), "Redis OK" if pong else "Redis ping failed"
         except Exception as e:
             return False, f"Redis error: {e}"
 
-    def check_db(self, session_factory: Optional[Callable[[], Any]] = None) -> Tuple[bool, str]:
+    def check_db(self, session_factory: Callable[[], Any] | None = None) -> tuple[bool, str]:
         """检查数据库连通性（执行 SELECT 1）。
 
         Args:
@@ -56,6 +59,7 @@ class HealthService:
             try:
                 # 使用简单查询验证连接
                 from sqlalchemy import text
+
                 db.execute(text("SELECT 1"))
                 return True, "DB OK"
             finally:
@@ -69,7 +73,7 @@ class HealthService:
         except Exception as e:
             return False, f"DB error: {e}"
 
-    async def check_all(self, redis_client=None, session_factory: Optional[Callable[[], Any]] = None) -> Dict[str, Any]:
+    async def check_all(self, redis_client=None, session_factory: Callable[[], Any] | None = None) -> dict[str, Any]:
         """综合检查 Redis 与 DB。
 
         Returns:
@@ -78,9 +82,9 @@ class HealthService:
         redis_ok, redis_msg = await self.check_redis(redis_client)
         db_ok, db_msg = self.check_db(session_factory)
         return {
-            'redis': {'ok': redis_ok, 'msg': redis_msg},
-            'db': {'ok': db_ok, 'msg': db_msg},
-            'ok': redis_ok and db_ok,
+            "redis": {"ok": redis_ok, "msg": redis_msg},
+            "db": {"ok": db_ok, "msg": db_msg},
+            "ok": redis_ok and db_ok,
         }
 
 
@@ -96,7 +100,7 @@ async def health_command(update, context):
         return
 
     result = await health_service.check_all()
-    status_emoji = "✅" if result['ok'] else "❌"
+    status_emoji = "✅" if result["ok"] else "❌"
     text = (
         f"{status_emoji} <b>健康检查</b>\n\n"
         f"Redis: {'✅' if result['redis']['ok'] else '❌'} - {result['redis']['msg']}\n"

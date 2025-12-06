@@ -4,4 +4,5 @@
 
 from .handler import HealthModule
 
-__all__ = ['HealthModule']
+
+__all__ = ["HealthModule"]

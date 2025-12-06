@@ -5,4 +5,5 @@
 
 from .handler import AdminModule
 
-__all__ = ['AdminModule']
+
+__all__ = ["AdminModule"]

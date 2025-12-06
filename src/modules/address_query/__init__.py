@@ -4,4 +4,5 @@
 
 from .handler import AddressQueryModule
 
-__all__ = ['AddressQueryModule']
+
+__all__ = ["AddressQueryModule"]

@@ -6,15 +6,15 @@
 
 class MainMenuMessages:
     """主菜单的所有消息模板"""
-    
+
     # 主菜单
     MAIN_MENU = """🤖 <b>主菜单</b>
 
 📋 请选择功能："""
-    
+
     # 键盘提示
     KEYBOARD_HINT = """📱 使用下方按钮快速访问功能："""
-    
+
     # 免费克隆消息（从设置中动态加载）
     FREE_CLONE_DEFAULT = """🎁 <b>免费克隆功能</b>
 

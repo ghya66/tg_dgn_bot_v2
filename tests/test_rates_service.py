@@ -1,5 +1,6 @@
 import json
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -18,38 +19,25 @@ class DummyResponse:
         return None
 
 
-class DummyClient:
-    def __init__(self, payloads):
-        self._payloads = payloads
-        self._index = 0
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb):
-        return False
-
-    async def get(self, *args, **kwargs):
-        payload = self._payloads[self._index]
-        self._index += 1
-        return DummyResponse(payload)
-
-
 @pytest.mark.asyncio
 async def test_fetch_usdt_cny_from_okx_parses_response(monkeypatch):
+    """测试 OKX 汇率解析"""
+    # 模拟 get_with_retry 返回不同渠道的响应
+    call_count = 0
     payloads = [
         {"code": "0", "data": {"items": [{"price": "7.10", "paymentMethods": ["bank"]}]}},
         {"code": "0", "data": {"items": [{"price": "7.11", "paymentMethods": ["aliPay"]}]}},
         {"code": "0", "data": {"items": [{"price": "7.12", "paymentMethods": ["wechat"]}]}},
     ]
 
-    class ClientFactory:
-        def __call__(self, *args, **kwargs):
-            return DummyClient(payloads.copy())
+    async def mock_get_with_retry(*args, **kwargs):
+        nonlocal call_count
+        payload = payloads[call_count % len(payloads)]
+        call_count += 1
+        return DummyResponse(payload)
 
-    monkeypatch.setattr(rates_service.httpx, "AsyncClient", ClientFactory())
-
-    prices = await rates_service.fetch_usdt_cny_from_okx()
+    with patch("src.common.http_utils.get_with_retry", side_effect=mock_get_with_retry):
+        prices = await rates_service.fetch_usdt_cny_from_okx()
 
     assert prices["bank"]["min_price"] == pytest.approx(7.10)
     assert prices["alipay"]["min_price"] == pytest.approx(7.11)

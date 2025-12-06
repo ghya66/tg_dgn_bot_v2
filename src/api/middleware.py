@@ -8,13 +8,12 @@ API中间件配置
 
 import logging
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
+
 from fastapi import FastAPI, Request, Response
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
 from ..common.redis_helper import create_redis_client
-from ..config import settings
 
 
 logger = logging.getLogger(__name__)
@@ -23,6 +22,7 @@ logger = logging.getLogger(__name__)
 # 速率限制配置
 class RateLimitConfig:
     """速率限制配置"""
+
     # 按 IP 限制（针对未认证请求）
     IP_LIMIT_REQUESTS: int = 60  # 每分钟最大请求数
     IP_LIMIT_WINDOW_SECONDS: int = 60  # 时间窗口（秒）
@@ -70,7 +70,7 @@ async def log_requests(request: Request, call_next: Callable) -> Response:
 
     记录所有API请求的详细信息，并添加 trace_id 关联日志
     """
-    from src.common.logging_config import set_trace_id, clear_trace_id, get_trace_id
+    from src.common.logging_config import clear_trace_id, set_trace_id
 
     start_time = time.time()
 
@@ -81,8 +81,7 @@ async def log_requests(request: Request, call_next: Callable) -> Response:
 
     # 记录请求信息
     logger.info(
-        f"API Request: {request.method} {request.url.path} "
-        f"from {request.client.host if request.client else 'unknown'}"
+        f"API Request: {request.method} {request.url.path} from {request.client.host if request.client else 'unknown'}"
     )
 
     try:
@@ -94,8 +93,7 @@ async def log_requests(request: Request, call_next: Callable) -> Response:
 
         # 记录响应信息
         logger.info(
-            f"API Response: {request.method} {request.url.path} "
-            f"status={response.status_code} time={process_time:.3f}s"
+            f"API Response: {request.method} {request.url.path} status={response.status_code} time={process_time:.3f}s"
         )
 
         # 添加处理时间和 trace_id 到响应头
@@ -182,6 +180,7 @@ def get_client_identifier(request: Request) -> tuple[str, str]:
     if api_key:
         # 使用 API Key 的哈希值作为标识符（避免在 Redis 中存储完整 key）
         import hashlib
+
         key_hash = hashlib.sha256(api_key.encode()).hexdigest()[:16]
         return "api_key", f"key:{key_hash}"
 
@@ -223,14 +222,10 @@ async def rate_limit_middleware(request: Request, call_next: Callable) -> Respon
         window = RateLimitConfig.IP_LIMIT_WINDOW_SECONDS
 
     # 检查速率限制
-    is_allowed, remaining, reset_time = await check_rate_limit(
-        identifier, limit, window
-    )
+    is_allowed, remaining, reset_time = await check_rate_limit(identifier, limit, window)
 
     if not is_allowed:
-        logger.warning(
-            f"速率限制触发: {identifier}, path={path}, limit={limit}/{window}s"
-        )
+        logger.warning(f"速率限制触发: {identifier}, path={path}, limit={limit}/{window}s")
         return JSONResponse(
             status_code=429,
             content={
@@ -243,7 +238,7 @@ async def rate_limit_middleware(request: Request, call_next: Callable) -> Respon
                 "X-RateLimit-Remaining": "0",
                 "X-RateLimit-Reset": str(reset_time),
                 "Retry-After": str(window),
-            }
+            },
         )
 
     # 处理请求
@@ -264,6 +259,7 @@ def setup_middleware(app: FastAPI):
     Args:
         app: FastAPI应用实例
     """
+
     # 添加请求日志中间件
     @app.middleware("http")
     async def add_log_requests(request: Request, call_next):
@@ -282,8 +278,10 @@ def setup_middleware(app: FastAPI):
 
     # 注意：Redis 连接清理已移至 app.py 的 lifespan 中统一管理
 
-    logger.info("✅ API中间件设置完成（含速率限制: IP=%d/%ds, API_KEY=%d/%ds）",
-                RateLimitConfig.IP_LIMIT_REQUESTS,
-                RateLimitConfig.IP_LIMIT_WINDOW_SECONDS,
-                RateLimitConfig.API_KEY_LIMIT_REQUESTS,
-                RateLimitConfig.API_KEY_LIMIT_WINDOW_SECONDS)
+    logger.info(
+        "✅ API中间件设置完成（含速率限制: IP=%d/%ds, API_KEY=%d/%ds）",
+        RateLimitConfig.IP_LIMIT_REQUESTS,
+        RateLimitConfig.IP_LIMIT_WINDOW_SECONDS,
+        RateLimitConfig.API_KEY_LIMIT_REQUESTS,
+        RateLimitConfig.API_KEY_LIMIT_WINDOW_SECONDS,
+    )

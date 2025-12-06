@@ -4,4 +4,5 @@
 
 from .handler import EnergyModule
 
-__all__ = ['EnergyModule']
+
+__all__ = ["EnergyModule"]

@@ -4,4 +4,5 @@
 
 from .handler import ProfileModule
 
-__all__ = ['ProfileModule']
+
+__all__ = ["ProfileModule"]

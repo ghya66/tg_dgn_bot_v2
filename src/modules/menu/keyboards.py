@@ -1,12 +1,13 @@
 """
 主菜单模块键盘布局
 """
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 
 
 class MenuKeyboards:
     """主菜单键盘类"""
-    
+
     @staticmethod
     def main_menu_inline() -> InlineKeyboardMarkup:
         """主菜单内联键盘"""
@@ -29,7 +30,7 @@ class MenuKeyboards:
             ],
         ]
         return InlineKeyboardMarkup(keyboard)
-    
+
     @staticmethod
     def main_menu_reply() -> ReplyKeyboardMarkup:
         """主菜单回复键盘"""
@@ -40,12 +41,9 @@ class MenuKeyboards:
             [KeyboardButton("❓ 帮助")],
         ]
         return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    
+
     @staticmethod
     def back_to_main() -> InlineKeyboardMarkup:
         """返回主菜单按钮"""
-        keyboard = [[
-            InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")
-        ]]
+        keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]]
         return InlineKeyboardMarkup(keyboard)
-    

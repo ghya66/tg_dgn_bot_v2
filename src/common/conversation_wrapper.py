@@ -2,19 +2,22 @@
 ConversationHandler包装器
 确保所有对话处理器的一致性和隔离性
 """
-import logging
+
 import functools
-from typing import List, Dict, Any, Optional, Callable, Set
+import logging
+
 from telegram import Update
 from telegram.ext import (
-    ContextTypes,
-    ConversationHandler,
     CallbackQueryHandler,
     CommandHandler,
+    ContextTypes,
+    ConversationHandler,
     MessageHandler,
-    filters
+    filters,
 )
+
 from .navigation_manager import NavigationManager
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +29,10 @@ class ConversationTracker:
     """
 
     # 用户活跃对话: {user_id: handler_name}
-    _active_conversations: Dict[int, str] = {}
+    _active_conversations: dict[int, str] = {}
 
     # 已注册的所有 ConversationHandler 实例
-    _registered_handlers: Dict[str, ConversationHandler] = {}
+    _registered_handlers: dict[str, ConversationHandler] = {}
 
     @classmethod
     def register_handler(cls, name: str, handler: ConversationHandler) -> None:
@@ -59,7 +62,7 @@ class ConversationTracker:
         cls._active_conversations[user_id] = handler_name
 
     @classmethod
-    def clear_active(cls, user_id: int, handler_name: Optional[str] = None) -> None:
+    def clear_active(cls, user_id: int, handler_name: str | None = None) -> None:
         """
         清除用户的活跃对话
 
@@ -75,7 +78,7 @@ class ConversationTracker:
             cls._active_conversations.pop(user_id, None)
 
     @classmethod
-    def get_active(cls, user_id: int) -> Optional[str]:
+    def get_active(cls, user_id: int) -> str | None:
         """
         获取用户当前活跃的对话
 
@@ -102,9 +105,9 @@ class ConversationTracker:
 
         # 获取 chat_id
         chat_id = None
-        if hasattr(context, '_chat_id'):
+        if hasattr(context, "_chat_id"):
             chat_id = context._chat_id
-        elif hasattr(context, 'chat_data') and context._chat_id_and_data:
+        elif hasattr(context, "chat_data") and context._chat_id_and_data:
             chat_id = context._chat_id_and_data[0]
 
         # 清除所有已注册 ConversationHandler 的内部状态
@@ -116,11 +119,7 @@ class ConversationTracker:
 
     @classmethod
     def _clear_handler_internal_state(
-        cls,
-        handler: ConversationHandler,
-        user_id: int,
-        chat_id: Optional[int],
-        handler_name: str
+        cls, handler: ConversationHandler, user_id: int, chat_id: int | None, handler_name: str
     ) -> None:
         """
         清除单个 ConversationHandler 的内部对话状态
@@ -131,7 +130,7 @@ class ConversationTracker:
             chat_id: 聊天ID
             handler_name: 处理器名称（用于日志）
         """
-        if not hasattr(handler, '_conversations'):
+        if not hasattr(handler, "_conversations"):
             return
 
         # ConversationHandler 使用不同的键格式，取决于 per_chat 和 per_user 设置
@@ -171,31 +170,29 @@ class SafeConversationHandler:
 
     # 全局导航模式列表
     NAVIGATION_PATTERNS = [
-        r'^(back_to_main|nav_back_to_main|menu_back_to_main|addrq_back_to_main)$',  # 返回主菜单
-        r'^admin_back$',  # 管理员面板返回
-        r'^orders_back$',  # 订单管理返回
+        r"^(back_to_main|nav_back_to_main|menu_back_to_main|addrq_back_to_main)$",  # 返回主菜单
+        r"^admin_back$",  # 管理员面板返回
+        r"^orders_back$",  # 订单管理返回
     ]
 
     # 菜单切换模式（需要结束当前对话）
-    MENU_SWITCH_PATTERNS = [
-        r'^menu_(profile|address_query|energy|trx_exchange|premium|support|clone|help|admin)$'
-    ]
+    MENU_SWITCH_PATTERNS = [r"^menu_(profile|address_query|energy|trx_exchange|premium|support|clone|help|admin)$"]
 
     # 全局命令（始终可用）
-    GLOBAL_COMMANDS = ['start', 'help', 'cancel']
-    
+    GLOBAL_COMMANDS = ["start", "help", "cancel"]
+
     @classmethod
     def create(
         cls,
-        entry_points: List,
-        states: Dict,
-        fallbacks: List,
+        entry_points: list,
+        states: dict,
+        fallbacks: list,
         allow_reentry: bool = True,
-        name: Optional[str] = None,
+        name: str | None = None,
         per_message: bool = False,
         per_chat: bool = True,
         per_user: bool = True,
-        conversation_timeout: Optional[int] = None
+        conversation_timeout: int | None = None,
     ) -> ConversationHandler:
         """
         创建安全的ConversationHandler
@@ -236,7 +233,7 @@ class SafeConversationHandler:
             per_message=per_message,
             per_chat=per_chat,
             per_user=per_user,
-            conversation_timeout=conversation_timeout
+            conversation_timeout=conversation_timeout,
         )
 
         # 注册处理器到追踪器
@@ -246,7 +243,7 @@ class SafeConversationHandler:
         return handler
 
     @classmethod
-    def _wrap_entry_points(cls, entry_points: List, handler_name: str) -> List:
+    def _wrap_entry_points(cls, entry_points: list, handler_name: str) -> list:
         """
         包装入口点处理函数，在进入对话时清理其他活跃对话
 
@@ -263,7 +260,7 @@ class SafeConversationHandler:
         return wrapped
 
     @classmethod
-    def _wrap_states(cls, states: Dict, handler_name: str) -> Dict:
+    def _wrap_states(cls, states: dict, handler_name: str) -> dict:
         """
         包装状态处理函数
 
@@ -324,85 +321,79 @@ class SafeConversationHandler:
         # 创建新的处理器实例
         handler.callback = wrapped_callback
         return handler
-    
+
     @classmethod
-    def _build_safe_fallbacks(cls, original_fallbacks: List, handler_name: str) -> List:
+    def _build_safe_fallbacks(cls, original_fallbacks: list, handler_name: str) -> list:
         """
         构建安全的fallback列表
-        
+
         Args:
             original_fallbacks: 原始fallback列表
             handler_name: 处理器名称
-            
+
         Returns:
             安全的fallback列表
         """
         safe_fallbacks = []
-        
+
         # 1. 不在这里添加导航处理 - NavigationManager已在group=0全局注册
         # 由于NavigationManager在group=0（最高优先级）全局注册，
         # 所有导航回调都会被它拦截并处理
         # 如果在这里再添加，会导致重复处理
         logger.debug(f"SafeConversationHandler '{handler_name}': 导航由全局NavigationManager处理")
-        
+
         # 2. 添加菜单切换处理 - 这些不会和全局导航冲突
         for pattern in cls.MENU_SWITCH_PATTERNS:
-            safe_fallbacks.append(
-                CallbackQueryHandler(
-                    cls._handle_menu_switch,
-                    pattern=pattern
-                )
-            )
-        
+            safe_fallbacks.append(CallbackQueryHandler(cls._handle_menu_switch, pattern=pattern))
+
         # 3. 添加全局命令处理
-        safe_fallbacks.append(
-            CommandHandler('cancel', cls._handle_cancel)
-        )
-        
+        safe_fallbacks.append(CommandHandler("cancel", cls._handle_cancel))
+
         # 4. 过滤并添加原始fallbacks
         for fb in original_fallbacks:
             if cls._should_include_fallback(fb):
                 safe_fallbacks.append(fb)
             else:
                 logger.debug(f"过滤掉fallback: {fb}")
-        
+
         # 5. 添加默认错误处理
         safe_fallbacks.append(
-            MessageHandler(
-                filters.ALL,
-                lambda u, c: cls._handle_unexpected_input(u, c, handler_name)
-            )
+            MessageHandler(filters.ALL, lambda u, c: cls._handle_unexpected_input(u, c, handler_name))
         )
-        
+
         return safe_fallbacks
-    
+
     @classmethod
     def _should_include_fallback(cls, fallback) -> bool:
         """
         判断是否应该包含某个fallback
-        
+
         Args:
             fallback: 原始fallback处理器
-            
+
         Returns:
             是否包含
         """
         # 跳过会干扰导航的处理器
         if isinstance(fallback, CallbackQueryHandler):
-            pattern = getattr(fallback.pattern, 'pattern', None) if hasattr(fallback, 'pattern') else None
+            pattern = getattr(fallback.pattern, "pattern", None) if hasattr(fallback, "pattern") else None
             if pattern:
                 pattern_str = str(pattern)
                 # 检查是否包含导航相关模式
                 skip_patterns = [
-                    'back_to_main', 'nav_back_to_main', 'menu_back_to_main', 'addrq_back_to_main',
-                    'admin_back', 'orders_back'
+                    "back_to_main",
+                    "nav_back_to_main",
+                    "menu_back_to_main",
+                    "addrq_back_to_main",
+                    "admin_back",
+                    "orders_back",
                 ]
                 for skip in skip_patterns:
                     if skip in pattern_str:
                         return False
-        
+
         return True
-    
+
     @staticmethod
     async def _handle_cancel(update, context) -> int:
         """处理取消命令"""
@@ -452,34 +443,27 @@ class SafeConversationHandler:
 
         # 不做任何响应，保持在当前状态
         return None
-    
+
     @classmethod
     def create_simple(
-        cls,
-        command: str,
-        handler_func,
-        states: Optional[Dict] = None,
-        name: Optional[str] = None
+        cls, command: str, handler_func, states: dict | None = None, name: str | None = None
     ) -> ConversationHandler:
         """
         创建简单的对话处理器（单命令入口）
-        
+
         Args:
             command: 命令名称
             handler_func: 处理函数
             states: 状态字典（可选）
             name: 处理器名称
-            
+
         Returns:
             配置好的ConversationHandler
         """
         entry_points = [CommandHandler(command, handler_func)]
         states = states or {}
         fallbacks = []
-        
+
         return cls.create(
-            entry_points=entry_points,
-            states=states,
-            fallbacks=fallbacks,
-            name=name or f"simple_{command}"
+            entry_points=entry_points, states=states, fallbacks=fallbacks, name=name or f"simple_{command}"
         )

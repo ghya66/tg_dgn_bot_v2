@@ -8,8 +8,9 @@ API认证模块
 """
 
 import logging
-from typing import Optional
-from fastapi import HTTPException, Header
+
+from fastapi import Header, HTTPException
+
 from src.config import settings
 
 
@@ -27,7 +28,7 @@ def get_valid_api_keys() -> list:
     Returns:
         有效的 API 密钥列表
     """
-    api_keys = getattr(settings, 'api_keys', [])
+    api_keys = getattr(settings, "api_keys", [])
 
     # 确保返回列表类型
     if not api_keys:
@@ -40,9 +41,7 @@ def get_valid_api_keys() -> list:
     return list(api_keys)
 
 
-async def api_key_auth(
-    x_api_key: Optional[str] = Header(None, description="API密钥")
-) -> str:
+async def api_key_auth(x_api_key: str | None = Header(None, description="API密钥")) -> str:
     """
     API密钥认证
 
@@ -72,30 +71,22 @@ async def api_key_auth(
             "API authentication failed: api_keys not configured. "
             "Please set API_KEYS environment variable for production."
         )
-        raise HTTPException(
-            status_code=503,
-            detail="API service not configured. Contact administrator."
-        )
+        raise HTTPException(status_code=503, detail="API service not configured. Contact administrator.")
 
     if x_api_key not in valid_api_keys:
         logger.warning(f"Invalid API key attempt: {x_api_key[:8]}...")
-        raise HTTPException(
-            status_code=403,
-            detail="Invalid API key"
-        )
+        raise HTTPException(status_code=403, detail="Invalid API key")
 
     return x_api_key
 
 
-async def optional_api_key_auth(
-    x_api_key: Optional[str] = Header(None, description="API密钥")
-) -> Optional[str]:
+async def optional_api_key_auth(x_api_key: str | None = Header(None, description="API密钥")) -> str | None:
     """
     可选的API密钥认证（某些接口可以不需要认证）
-    
+
     Args:
         x_api_key: 请求头中的API密钥
-        
+
     Returns:
         API密钥或None
     """

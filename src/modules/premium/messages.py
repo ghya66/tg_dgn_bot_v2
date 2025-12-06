@@ -6,7 +6,7 @@ Premium模块消息模板
 
 class PremiumMessages:
     """Premium模块的所有消息模板"""
-    
+
     # 开始界面
     START = """🎁 <b>Premium 会员开通</b>
 

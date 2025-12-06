@@ -5,13 +5,8 @@
 
 from .base import BaseModule
 from .formatter import MessageFormatter
-from .state_manager import ModuleStateManager
 from .registry import ModuleRegistry, get_registry
+from .state_manager import ModuleStateManager
 
-__all__ = [
-    'BaseModule',
-    'MessageFormatter',
-    'ModuleStateManager',
-    'ModuleRegistry',
-    'get_registry'
-]
+
+__all__ = ["BaseModule", "MessageFormatter", "ModuleRegistry", "ModuleStateManager", "get_registry"]

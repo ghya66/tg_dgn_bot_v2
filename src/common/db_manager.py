@@ -2,10 +2,13 @@
 数据库上下文管理器
 确保数据库连接正确关闭
 """
-from contextlib import contextmanager
-from typing import Generator
-from sqlalchemy.orm import Session
+
 import logging
+from collections.abc import Generator
+from contextlib import contextmanager
+
+from sqlalchemy.orm import Session
+
 
 logger = logging.getLogger(__name__)
 
@@ -14,17 +17,17 @@ logger = logging.getLogger(__name__)
 def get_db_context() -> Generator[Session, None, None]:
     """
     数据库上下文管理器
-    
+
     使用方法:
         with get_db_context() as db:
             # 执行数据库操作
             user = db.query(User).first()
-    
+
     Returns:
         数据库会话
     """
-    from src.database import get_db, close_db
-    
+    from src.database import close_db, get_db
+
     db = get_db()
     try:
         yield db
@@ -61,7 +64,7 @@ def get_db_context_readonly() -> Generator[Session, None, None]:
     Returns:
         数据库会话（只读）
     """
-    from src.database import get_db, close_db
+    from src.database import close_db, get_db
 
     db = get_db()
     try:
@@ -92,7 +95,7 @@ def get_db_context_manual_commit() -> Generator[Session, None, None]:
     Returns:
         数据库会话
     """
-    from src.database import get_db, close_db
+    from src.database import close_db, get_db
 
     db = get_db()
     try:
@@ -111,7 +114,7 @@ def get_db_context_manual_commit() -> Generator[Session, None, None]:
 def execute_in_transaction(func):
     """
     装饰器：自动管理数据库事务
-    
+
     使用方法:
         @execute_in_transaction
         def update_user(user_id: int, name: str):
@@ -119,9 +122,11 @@ def execute_in_transaction(func):
             user = db.query(User).filter(User.id == user_id).first()
             user.name = name
     """
+
     def wrapper(*args, **kwargs):
         with get_db_context() as db:
             # 将db注入到函数参数中
-            kwargs['db'] = db
+            kwargs["db"] = db
             return func(*args, **kwargs)
+
     return wrapper

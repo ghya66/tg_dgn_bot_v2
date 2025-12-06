@@ -4,4 +4,5 @@
 
 from .handler import MainMenuModule
 
-__all__ = ['MainMenuModule']
+
+__all__ = ["MainMenuModule"]

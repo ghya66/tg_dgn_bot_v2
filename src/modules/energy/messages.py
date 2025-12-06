@@ -6,7 +6,7 @@
 
 class EnergyMessages:
     """能量兑换的所有消息模板"""
-    
+
     # 主菜单
     MAIN_MENU = """⚡ <b>能量兑换服务</b>
 

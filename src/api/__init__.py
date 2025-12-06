@@ -6,4 +6,5 @@ Bot API接口层
 from .app import create_api_app
 from .routes import router
 
-__all__ = ['create_api_app', 'router']
+
+__all__ = ["create_api_app", "router"]

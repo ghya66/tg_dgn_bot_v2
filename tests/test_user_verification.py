@@ -190,43 +190,48 @@ async def test_run_verification_ci():
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
     
-    # Mock get_db 和 close_db
-    with patch('src.modules.premium.user_verification.get_db') as mock_get_db:
-        with patch('src.modules.premium.user_verification.close_db') as mock_close_db:
-            mock_get_db.return_value = SessionLocal()
-            mock_close_db.return_value = None
-            
-            # 运行测试
-            service = UserVerificationService(bot_username="test_bot")
-            test_db = SessionLocal()
-            
-            # 创建模拟用户
-            mock_user = MagicMock(spec=User)
-            mock_user.id = 123456789
-            mock_user.username = "testuser"
-            mock_user.first_name = "Test"
-            
-            # 测试绑定
-            print("\n[测试] 绑定用户...")
-            result = await service.bind_user(mock_user)
-            assert result is True
-            print("✅ 绑定成功")
-            
-            # 测试验证
-            print("[测试] 验证用户存在...")
-            result = await service.verify_user_exists("testuser")
-            assert result["exists"] is True
-            print("✅ 验证成功")
-            
-            # 测试查询
-            print("[测试] 通过ID查询...")
-            result = await service.get_user_by_id(123456789)
-            assert result is not None
-            print("✅ 查询成功")
-            
-            print("\n" + "-"*80)
-            print(" 用户验证服务测试通过 ✅ ".center(80))
-            print("-"*80)
+    # Mock get_db_context 为返回 test_db 的上下文管理器
+    from contextlib import contextmanager
+    test_db = SessionLocal()
+
+    @contextmanager
+    def mock_db_context():
+        yield test_db
+
+    with patch('src.modules.premium.user_verification.get_db_context', mock_db_context):
+        # 运行测试
+        service = UserVerificationService(bot_username="test_bot")
+
+        # 创建模拟用户
+        mock_user = MagicMock(spec=User)
+        mock_user.id = 123456789
+        mock_user.username = "testuser"
+        mock_user.first_name = "Test"
+
+        # 测试绑定
+        print("\n[测试] 绑定用户...")
+        result = await service.bind_user(mock_user)
+        assert result is True
+        print("✅ 绑定成功")
+
+        # 测试验证
+        print("[测试] 验证用户存在...")
+        result = await service.verify_user_exists("testuser")
+        assert result["exists"] is True
+        print("✅ 验证成功")
+
+        # 测试查询
+        print("[测试] 通过ID查询...")
+        result = await service.get_user_by_id(123456789)
+        assert result is not None
+        print("✅ 查询成功")
+
+        print("\n" + "-"*80)
+        print(" 用户验证服务测试通过 ✅ ".center(80))
+        print("-"*80)
+
+    test_db.close()
+    engine.dispose()
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@
 
 class HelpMessages:
     """帮助消息模板"""
-    
+
     MAIN_HELP = """<b>帮助中心</b>
 
 欢迎使用！请选择帮助分类：
@@ -37,10 +37,11 @@ class HelpMessages:
         """获取支付充值帮助（动态订单超时时间）"""
         try:
             from src.common.settings_service import get_order_timeout_minutes
+
             timeout = get_order_timeout_minutes()
         except Exception:
             timeout = 30
-        
+
         return f"""<b>支付充值</b>
 
 <b>支持的支付方式：</b>
@@ -64,6 +65,7 @@ class HelpMessages:
         """获取服务使用帮助（动态价格）"""
         try:
             from src.bot_admin.config_manager import config_manager
+
             price_3 = config_manager.get_price("premium_3_months", 10)
             price_6 = config_manager.get_price("premium_6_months", 18)
             price_12 = config_manager.get_price("premium_12_months", 30)
@@ -72,7 +74,7 @@ class HelpMessages:
         except Exception:
             price_3, price_6, price_12 = 10, 18, 30
             energy_small, energy_large = 3, 6
-        
+
         return f"""<b>服务使用</b>
 
 <b>Premium 会员：</b>
@@ -102,10 +104,11 @@ class HelpMessages:
         """获取查询功能帮助（动态限频时间）"""
         try:
             from src.common.settings_service import get_address_cooldown_minutes
+
             cooldown = get_address_cooldown_minutes()
         except Exception:
             cooldown = 30
-        
+
         return f"""<b>查询功能</b>
 
 <b>地址查询（免费）：</b>

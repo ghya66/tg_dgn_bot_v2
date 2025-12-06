@@ -3,19 +3,25 @@ Redis 连接辅助模块
 支持 Zeabur 自动注入的环境变量和连接字符串
 包含自动重连机制和健康检查
 """
+
+import asyncio
+import logging
+
 import redis.asyncio as redis
 from redis.asyncio.retry import Retry
 from redis.backoff import ExponentialBackoff
 from redis.exceptions import (
-    ConnectionError as RedisConnectionError,
-    TimeoutError as RedisTimeoutError,
     BusyLoadingError,
 )
-from typing import Optional
-import logging
-import asyncio
+from redis.exceptions import (
+    ConnectionError as RedisConnectionError,
+)
+from redis.exceptions import (
+    TimeoutError as RedisTimeoutError,
+)
 
 from ..config import settings
+
 
 logger = logging.getLogger(__name__)
 
@@ -113,13 +119,7 @@ async def check_redis_connection() -> bool:
         return False
 
 
-async def execute_with_retry(
-    client: redis.Redis,
-    operation: str,
-    *args,
-    max_retries: int = 3,
-    **kwargs
-):
+async def execute_with_retry(client: redis.Redis, operation: str, *args, max_retries: int = 3, **kwargs):
     """
     带重试的 Redis 操作执行器
 
@@ -146,10 +146,9 @@ async def execute_with_retry(
             return await method(*args, **kwargs)
         except (RedisConnectionError, RedisTimeoutError, BusyLoadingError) as e:
             last_error = e
-            wait_time = min(2 ** attempt * 0.1, 5)  # 指数退避，最大 5 秒
+            wait_time = min(2**attempt * 0.1, 5)  # 指数退避，最大 5 秒
             logger.warning(
-                "Redis 操作 %s 失败 (尝试 %d/%d): %s，%s 秒后重试",
-                operation, attempt + 1, max_retries, e, wait_time
+                "Redis 操作 %s 失败 (尝试 %d/%d): %s，%s 秒后重试", operation, attempt + 1, max_retries, e, wait_time
             )
             if attempt < max_retries - 1:
                 await asyncio.sleep(wait_time)

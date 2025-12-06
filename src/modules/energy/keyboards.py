@@ -7,7 +7,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 class EnergyKeyboards:
     """能量模块的所有键盘布局"""
-    
+
     @staticmethod
     def main_menu():
         """主菜单键盘"""
@@ -18,7 +18,7 @@ class EnergyKeyboards:
             [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
-    
+
     @staticmethod
     def hourly_packages():
         """时长能量套餐键盘"""
@@ -29,7 +29,7 @@ class EnergyKeyboards:
             [InlineKeyboardButton("❌ 取消", callback_data="energy_cancel")],
         ]
         return InlineKeyboardMarkup(keyboard)
-    
+
     @staticmethod
     def payment_done():
         """支付完成键盘"""
@@ -38,7 +38,7 @@ class EnergyKeyboards:
             [InlineKeyboardButton("❌ 取消订单", callback_data="energy_cancel")],
         ]
         return InlineKeyboardMarkup(keyboard)
-    
+
     @staticmethod
     def skip_tx_hash():
         """跳过交易哈希键盘"""
@@ -47,7 +47,7 @@ class EnergyKeyboards:
             [InlineKeyboardButton("❌ 取消", callback_data="energy_cancel")],
         ]
         return InlineKeyboardMarkup(keyboard)
-    
+
     @staticmethod
     def back_and_cancel():
         """返回和取消键盘"""

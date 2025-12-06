@@ -15,16 +15,17 @@ Services 层 - 业务逻辑服务接口
 注：能量服务已迁移到 src.modules.energy
 """
 
-from .payment_service import PaymentService
-from .wallet_service import WalletService
-from .trx_service import TRXService
 from .address_service import AddressService
 from .config_service import ConfigService
+from .payment_service import PaymentService
+from .trx_service import TRXService
+from .wallet_service import WalletService
+
 
 __all__ = [
-    "PaymentService",
-    "WalletService",
-    "TRXService",
     "AddressService",
     "ConfigService",
+    "PaymentService",
+    "TRXService",
+    "WalletService",
 ]

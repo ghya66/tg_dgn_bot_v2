@@ -1,8 +1,8 @@
 """TRX Exchange Order Models."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import Column, String, Integer, DECIMAL, DateTime
+from sqlalchemy import DECIMAL, Column, DateTime, Integer, String
 
 from src.database import Base
 
@@ -28,7 +28,7 @@ class TRXExchangeOrder(Base):
     tx_hash = Column(String(128), nullable=True, comment="User's USDT Payment Transaction Hash")
     send_tx_hash = Column(String(128), nullable=True, comment="Bot's TRX Transfer Transaction Hash")
     error_message = Column(String(512), nullable=True, comment="Error message if failed")
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     paid_at = Column(DateTime, nullable=True, comment="Payment Received Time")
     completed_at = Column(DateTime, nullable=True, comment="TRX Sent Time")
     expires_at = Column(DateTime, nullable=True, comment="Order expiration timestamp (UTC)")

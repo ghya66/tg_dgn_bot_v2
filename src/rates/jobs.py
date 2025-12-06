@@ -1,10 +1,13 @@
 """Job queue tasks for USDT rate refreshing."""
+
 from __future__ import annotations
 
 import logging
+
 from telegram.ext import ContextTypes
 
 from .service import refresh_usdt_rates
+
 
 logger = logging.getLogger(__name__)
 

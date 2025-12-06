@@ -1,15 +1,16 @@
 """USDT 汇率刷新与缓存服务。"""
+
 from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
-import httpx
 import redis.asyncio as redis
 
 from ..config import settings
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +27,16 @@ PAYMENT_METHODS = {
     "wechat": "wechat",
 }
 
-_redis_client: Optional[redis.Redis] = None
+_redis_client: redis.Redis | None = None
 
 
-async def _get_redis_client() -> Optional[redis.Redis]:
+async def _get_redis_client() -> redis.Redis | None:
     """惰性创建 Redis 客户端（支持 Zeabur 连接字符串）。"""
     global _redis_client
     if _redis_client is None:
         try:
             from ..common.redis_helper import create_redis_client
+
             _redis_client = create_redis_client(decode_responses=True)
         except Exception as exc:  # pragma: no cover - 极端配置错误
             logger.warning("初始化 Redis 客户端失败: %s", exc)
@@ -42,14 +44,12 @@ async def _get_redis_client() -> Optional[redis.Redis]:
     return _redis_client
 
 
-async def fetch_usdt_cny_from_okx() -> Dict[str, Dict[str, Any]]:
+async def fetch_usdt_cny_from_okx() -> dict[str, dict[str, Any]]:
     """从 OKX C2C 获取不同支付渠道的 USDT-CNY 报价与商家列表。"""
-    channel_prices: Dict[str, Dict[str, Any]] = {
-        key: {"min_price": None, "merchants": []} for key in PAYMENT_METHODS
-    }
+    channel_prices: dict[str, dict[str, Any]] = {key: {"min_price": None, "merchants": []} for key in PAYMENT_METHODS}
 
     from src.common.http_utils import get_with_retry
-    
+
     for channel, payment_method in PAYMENT_METHODS.items():
         params = {**OKX_C2C_COMMON_PARAMS, "paymentMethod": payment_method}
         try:
@@ -81,7 +81,7 @@ async def fetch_usdt_cny_from_okx() -> Dict[str, Dict[str, Any]]:
             logger.warning("OKX C2C 数据为空 (%s): %s", channel, json.dumps(payload)[:200])
             continue
 
-        merchants: List[Dict[str, Any]] = []
+        merchants: list[dict[str, Any]] = []
         for entry in items[:10]:
             if not isinstance(entry, dict):
                 continue
@@ -93,10 +93,12 @@ async def fetch_usdt_cny_from_okx() -> Dict[str, Dict[str, Any]]:
                 continue
 
             name = entry.get("nickName") or entry.get("merchantId") or entry.get("publicUserId") or "商家"
-            merchants.append({
-                "price": price_val,
-                "name": name,
-            })
+            merchants.append(
+                {
+                    "price": price_val,
+                    "name": name,
+                }
+            )
 
         if merchants:
             channel_prices[channel]["min_price"] = merchants[0]["price"]
@@ -108,9 +110,9 @@ async def fetch_usdt_cny_from_okx() -> Dict[str, Dict[str, Any]]:
     return channel_prices
 
 
-def build_rates_payload(channel_prices: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+def build_rates_payload(channel_prices: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """根据渠道报价构建缓存载荷。"""
-    updated_at = datetime.now(timezone.utc).isoformat()
+    updated_at = datetime.now(UTC).isoformat()
 
     def _first_available_price() -> float:
         for key in ("bank", "alipay", "wechat"):
@@ -121,12 +123,12 @@ def build_rates_payload(channel_prices: Dict[str, Dict[str, Any]]) -> Dict[str, 
 
     base_price = _first_available_price()
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "updated_at": updated_at,
         "base": round(base_price, 4) if base_price else 0.0,
     }
 
-    details: Dict[str, Any] = {}
+    details: dict[str, Any] = {}
     for key in ("bank", "alipay", "wechat"):
         channel_info = channel_prices.get(key, {})
         price = channel_info.get("min_price")
@@ -140,7 +142,7 @@ def build_rates_payload(channel_prices: Dict[str, Dict[str, Any]]) -> Dict[str, 
     return payload
 
 
-async def refresh_usdt_rates(redis_client: Optional[redis.Redis] = None) -> Optional[Dict[str, Any]]:
+async def refresh_usdt_rates(redis_client: redis.Redis | None = None) -> dict[str, Any] | None:
     """刷新 USDT 汇率并写入 Redis。"""
     try:
         channel_prices = await fetch_usdt_cny_from_okx()
@@ -170,7 +172,7 @@ async def refresh_usdt_rates(redis_client: Optional[redis.Redis] = None) -> Opti
     return payload
 
 
-async def get_cached_rates(redis_client: Optional[redis.Redis] = None) -> Optional[Dict[str, Any]]:
+async def get_cached_rates(redis_client: redis.Redis | None = None) -> dict[str, Any] | None:
     """读取 Redis 中缓存的汇率。"""
     if redis_client is None:
         redis_client = await _get_redis_client()
@@ -195,10 +197,10 @@ async def get_cached_rates(redis_client: Optional[redis.Redis] = None) -> Option
 
 
 async def get_or_refresh_rates(
-    redis_client: Optional[redis.Redis] = None,
+    redis_client: redis.Redis | None = None,
     *,
     force_refresh: bool = False,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """优先读取缓存，必要时刷新。"""
     if not force_refresh:
         cached = await get_cached_rates(redis_client)

@@ -3,12 +3,13 @@
 
 定义所有管理按钮和菜单结构。
 """
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
 class AdminMenus:
     """管理面板菜单"""
-    
+
     @staticmethod
     def main_menu() -> InlineKeyboardMarkup:
         """主菜单"""
@@ -20,7 +21,7 @@ class AdminMenus:
             [InlineKeyboardButton("🚪 退出管理", callback_data="admin_exit")],
         ]
         return InlineKeyboardMarkup(keyboard)
-    
+
     @staticmethod
     def price_menu() -> InlineKeyboardMarkup:
         """价格配置菜单"""
@@ -31,7 +32,7 @@ class AdminMenus:
             [InlineKeyboardButton("🔙 返回主菜单", callback_data="admin_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
-    
+
     @staticmethod
     def premium_price_menu() -> InlineKeyboardMarkup:
         """Premium 价格配置菜单"""
@@ -42,7 +43,7 @@ class AdminMenus:
             [InlineKeyboardButton("🔙 返回", callback_data="admin_prices")],
         ]
         return InlineKeyboardMarkup(keyboard)
-    
+
     @staticmethod
     def energy_price_menu() -> InlineKeyboardMarkup:
         """能量价格配置菜单"""
@@ -53,7 +54,7 @@ class AdminMenus:
             [InlineKeyboardButton("🔙 返回", callback_data="admin_prices")],
         ]
         return InlineKeyboardMarkup(keyboard)
-    
+
     @staticmethod
     def content_menu() -> InlineKeyboardMarkup:
         """文案配置菜单"""
@@ -64,7 +65,7 @@ class AdminMenus:
             [InlineKeyboardButton("🔙 返回主菜单", callback_data="admin_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
-    
+
     @staticmethod
     def settings_menu() -> InlineKeyboardMarkup:
         """系统设置菜单"""
@@ -76,7 +77,7 @@ class AdminMenus:
             [InlineKeyboardButton("🔙 返回主菜单", callback_data="admin_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
-    
+
     @staticmethod
     def back_to_main() -> InlineKeyboardMarkup:
         """返回主菜单按钮"""

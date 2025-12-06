@@ -1,7 +1,9 @@
 """Configuration helpers for the TRX Exchange module."""
+
 from __future__ import annotations
 
 from decimal import Decimal
+
 from pydantic import BaseModel, SecretStr
 
 from src.config import settings
@@ -18,7 +20,7 @@ class TRXExchangeConfig(BaseModel):
     test_mode: bool = True
 
     @classmethod
-    def from_settings(cls) -> "TRXExchangeConfig":
+    def from_settings(cls) -> TRXExchangeConfig:
         """Create config instance from global settings."""
         # 安全地从 SecretStr 获取私钥值
         private_key_value = ""

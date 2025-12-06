@@ -1,15 +1,16 @@
 """TRX Exchange Rate Manager - Fixed Rate with Admin Control."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Optional
 
-from sqlalchemy import Column, String, DECIMAL, DateTime
+from sqlalchemy import DECIMAL, Column, DateTime, String
 from sqlalchemy.orm import Session
 
-from .config import TRXExchangeConfig
 from src.database import Base
+
+from .config import TRXExchangeConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,8 @@ class RateManager:
     """Manage TRX Exchange Rate with Cache."""
 
     # In-memory cache
-    _cached_rate: Optional[Decimal] = None
-    _cache_expires_at: Optional[datetime] = None
+    _cached_rate: Decimal | None = None
+    _cache_expires_at: datetime | None = None
     _cache_ttl_seconds = 3600  # 1 hour
     _config: TRXExchangeConfig = None
 
@@ -63,7 +64,7 @@ class RateManager:
         Returns:
             TRX/USDT rate (e.g., Decimal('3.05') means 1 USDT = 3.05 TRX)
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Return cached rate if valid
         if cls._cached_rate and cls._cache_expires_at and now < cls._cache_expires_at:
@@ -104,7 +105,7 @@ class RateManager:
         if new_rate <= 0:
             raise ValueError(f"Invalid rate: {new_rate} (must be > 0)")
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Update or insert rate
         rate_config = db.query(TRXExchangeRate).filter_by(id="current").first()

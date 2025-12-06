@@ -6,9 +6,11 @@
 
 注意：此模块使用异步方法，与 AsyncIOScheduler 兼容。
 """
+
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
+
 
 if TYPE_CHECKING:
     from telegram import Bot
@@ -16,10 +18,12 @@ if TYPE_CHECKING:
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.common.db_manager import get_db_context_manual_commit
+from src.common.settings_service import get_order_timeout_minutes
+
 from ..database import Order
 from ..payments.suffix_manager import SuffixManager
-from src.common.settings_service import get_order_timeout_minutes
-from src.common.db_manager import get_db_context_manual_commit
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +34,7 @@ class OrderExpiryTask:
     def __init__(self):
         """初始化任务"""
         self.suffix_manager = SuffixManager()
-        self._bot: Optional["Bot"] = None
+        self._bot: Bot | None = None
         logger.info("订单超时处理任务初始化完成")
 
     def set_bot(self, bot: "Bot") -> None:
@@ -54,12 +58,7 @@ class OrderExpiryTask:
         timeout_minutes = get_order_timeout_minutes()
         logger.info("订单超时检查任务：本次使用超时时间 %s 分钟", timeout_minutes)
 
-        stats = {
-            "checked": 0,
-            "expired": 0,
-            "suffix_released": 0,
-            "errors": 0
-        }
+        stats = {"checked": 0, "expired": 0, "suffix_released": 0, "errors": 0}
 
         # 使用手动提交的上下文管理器，确保连接正确关闭
         with get_db_context_manual_commit() as session:
@@ -68,10 +67,7 @@ class OrderExpiryTask:
                 timeout_time = datetime.now() - timedelta(minutes=timeout_minutes)
 
                 # 查询所有超时的 PENDING 订单
-                stmt = select(Order).where(
-                    Order.status == "PENDING",
-                    Order.created_at < timeout_time
-                )
+                stmt = select(Order).where(Order.status == "PENDING", Order.created_at < timeout_time)
                 expired_orders = session.execute(stmt).scalars().all()
 
                 stats["checked"] = len(expired_orders)
@@ -124,9 +120,7 @@ class OrderExpiryTask:
         order.status = "EXPIRED"
 
         logger.info(
-            f"订单 {order_id} 已过期 "
-            f"(类型: {order_type}, "
-            f"创建时间: {order.created_at.strftime('%Y-%m-%d %H:%M:%S')})"
+            f"订单 {order_id} 已过期 (类型: {order_type}, 创建时间: {order.created_at.strftime('%Y-%m-%d %H:%M:%S')})"
         )
 
         stats["expired"] += 1
@@ -166,7 +160,7 @@ class OrderExpiryTask:
         suffix_order_types = ["premium", "deposit", "trx_exchange"]
         return order_type in suffix_order_types
 
-    def _extract_suffix_from_amount(self, amount_micro_usdt: int) -> Optional[int]:
+    def _extract_suffix_from_amount(self, amount_micro_usdt: int) -> int | None:
         """
         从微 USDT 金额中提取后缀
 
@@ -179,18 +173,18 @@ class OrderExpiryTask:
         try:
             # 将微 USDT 转为 USDT（保留3位小数）
             amount_usdt = amount_micro_usdt / 1_000_000
-            
+
             # 提取小数部分的后三位
             # 例如：10.123 USDT -> 123
             suffix = int(round(amount_usdt * 1000)) % 1000
-            
+
             # 验证后缀范围（1-999）
             if 1 <= suffix <= 999:
                 return suffix
             else:
                 logger.warning(f"提取的后缀 {suffix} 超出范围 (金额: {amount_usdt} USDT)")
                 return None
-                
+
         except Exception as e:
             logger.error(f"提取后缀失败 (金额: {amount_micro_usdt}): {e}")
             return None
@@ -216,7 +210,7 @@ class OrderExpiryTask:
             "premium": "Premium会员",
             "deposit": "余额充值",
             "trx_exchange": "TRX兑换",
-            "energy": "能量服务"
+            "energy": "能量服务",
         }
         type_name = order_type_names.get(order_type, order_type)
 
@@ -230,11 +224,7 @@ class OrderExpiryTask:
 
         try:
             # 使用 await 替代 asyncio.run()，避免嵌套事件循环
-            await self._bot.send_message(
-                chat_id=user_id,
-                text=message,
-                parse_mode="HTML"
-            )
+            await self._bot.send_message(chat_id=user_id, text=message, parse_mode="HTML")
             logger.info(f"已通知用户 {user_id} 订单 {order_id} 过期")
             stats["notified"] = stats.get("notified", 0) + 1
         except Exception as e:

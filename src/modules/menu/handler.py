@@ -4,22 +4,23 @@
 优化了实时汇率显示（支持渠道切换）
 """
 
-import logging
 import json
+import logging
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import Any
+
 from telegram import (
-    Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    ReplyKeyboardMarkup,
     KeyboardButton,
+    ReplyKeyboardMarkup,
+    Update,
 )
 from telegram.ext import (
-    ContextTypes,
     BaseHandler,
-    CommandHandler,
     CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
     MessageHandler,
     filters,
 )
@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 class MainMenuModule(BaseModule):
     """标准化的主菜单模块"""
-    
+
     MAX_MERCHANT_ROWS = 10
     CHANNEL_TITLES = {
         "all": "✅ 全部渠道报价",
@@ -50,23 +51,25 @@ class MainMenuModule(BaseModule):
         "alipay": "💴",
         "wechat": "🟢",
     }
-    
+
     def __init__(self):
         """初始化主菜单模块"""
         self.formatter = MessageFormatter()
         self.state_manager = ModuleStateManager()
         self.keyboard_shown_key = "main_menu_keyboard_shown"
-    
+
     @property
     def module_name(self) -> str:
         """模块名称"""
         return "main_menu"
-    
-    def get_handlers(self) -> List[BaseHandler]:
+
+    def get_handlers(self) -> list[BaseHandler]:
         """获取模块处理器"""
         return [
             CommandHandler("start", self.start_command),
-            CallbackQueryHandler(self.show_main_menu, pattern=r"^(back_to_main|nav_back_to_main|menu_back_to_main|addrq_back_to_main)$"),
+            CallbackQueryHandler(
+                self.show_main_menu, pattern=r"^(back_to_main|nav_back_to_main|menu_back_to_main|addrq_back_to_main)$"
+            ),
             CallbackQueryHandler(self.handle_free_clone, pattern=r"^menu_clone$"),
             CallbackQueryHandler(self.handle_support, pattern=r"^menu_support$"),
             CallbackQueryHandler(self.handle_orders, pattern=r"^menu_orders$"),
@@ -78,43 +81,35 @@ class MainMenuModule(BaseModule):
             MessageHandler(filters.Regex(r"^🎁 免费克隆$"), self.show_clone_message),
             MessageHandler(filters.Regex(r"^👨‍💼 联系客服$"), self.show_support_message),
         ]
-    
+
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """处理 /start 命令"""
         from src.config import settings
-        
+
         user = update.effective_user
-        
+
         # 重要：重置键盘显示标志，因为/start是新的会话开始
         context.user_data[self.keyboard_shown_key] = False
-        
+
         # 从数据库读取欢迎语（支持热更新）
         text = get_content("welcome_message", default=settings.welcome_message)
         text = text.replace("{first_name}", self.formatter.escape_html(user.first_name or "朋友"))
-        
+
         # 构建引流按钮（InlineKeyboard）
         inline_keyboard = self._build_promotion_buttons()
         inline_markup = InlineKeyboardMarkup(inline_keyboard)
-        
+
         # 构建底部键盘（ReplyKeyboard）
         reply_markup = self._build_reply_keyboard()
-        
+
         # 先发送带InlineKeyboard的欢迎消息
-        await update.message.reply_text(
-            text, 
-            parse_mode="HTML", 
-            reply_markup=inline_markup
-        )
-        
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=inline_markup)
+
         # 然后设置底部键盘并发送提示
         # 注意：只在/start命令时发送键盘提示
-        await update.message.reply_text(
-            MainMenuMessages.KEYBOARD_HINT,
-            reply_markup=reply_markup,
-            parse_mode="HTML"
-        )
+        await update.message.reply_text(MainMenuMessages.KEYBOARD_HINT, reply_markup=reply_markup, parse_mode="HTML")
         context.user_data[self.keyboard_shown_key] = True
-    
+
     async def show_main_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """
         显示主菜单（从回调返回）
@@ -122,32 +117,24 @@ class MainMenuModule(BaseModule):
         """
         # 清理可能的临时状态（如地址查询等待状态）
         context.user_data.pop("awaiting_address", None)
-        
+
         # 构建菜单
         keyboard = self._build_promotion_buttons()
         inline_reply_markup = InlineKeyboardMarkup(keyboard)
-        
+
         text = MainMenuMessages.MAIN_MENU
-        
+
         query = update.callback_query
         if query:
             await query.answer()
             try:
                 # 只更新消息内容，不发送新消息
-                await query.edit_message_text(
-                    text, 
-                    parse_mode="HTML", 
-                    reply_markup=inline_reply_markup
-                )
+                await query.edit_message_text(text, parse_mode="HTML", reply_markup=inline_reply_markup)
             except Exception as e:
                 # 如果编辑失败（比如消息太旧），发送新消息
                 logger.warning(f"编辑消息失败: {e}")
-                await query.message.reply_text(
-                    text, 
-                    parse_mode="HTML", 
-                    reply_markup=inline_reply_markup
-                )
-            
+                await query.message.reply_text(text, parse_mode="HTML", reply_markup=inline_reply_markup)
+
             # 关键：从回调返回主菜单时，不再发送键盘提示
             # 因为ReplyKeyboard是持久的，用户已经有了
             # 这就解决了重复提示的问题
@@ -156,76 +143,64 @@ class MainMenuModule(BaseModule):
             message = update.message or update.effective_message
             if not message:
                 return
-            
-            await message.reply_text(
-                text, 
-                parse_mode="HTML", 
-                reply_markup=inline_reply_markup
-            )
-            
+
+            await message.reply_text(text, parse_mode="HTML", reply_markup=inline_reply_markup)
+
             # 只有在用户没有键盘时才显示
             # 比如新用户或者bot重启后的第一次
             if not context.user_data.get(self.keyboard_shown_key):
                 reply_markup = self._build_reply_keyboard()
-                await message.reply_text(
-                    MainMenuMessages.KEYBOARD_HINT,
-                    reply_markup=reply_markup,
-                    parse_mode="HTML"
-                )
+                await message.reply_text(MainMenuMessages.KEYBOARD_HINT, reply_markup=reply_markup, parse_mode="HTML")
                 context.user_data[self.keyboard_shown_key] = True
-    
+
     async def handle_free_clone(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """处理免费克隆功能"""
         from src.config import settings
-        
+
         query = update.callback_query
         await query.answer()
-        
+
         # 从数据库读取免费克隆文案（支持热更新）
         text = get_content("free_clone_message", default=settings.free_clone_message)
-        
+
         keyboard = [
             [InlineKeyboardButton("👨‍💼 联系客服", callback_data="menu_support")],
-            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await query.edit_message_text(
-            text, 
-            parse_mode="HTML", 
-            reply_markup=reply_markup
-        )
-    
-    def _build_promotion_buttons(self) -> List[List[InlineKeyboardButton]]:
+
+        await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+
+    def _build_promotion_buttons(self) -> list[list[InlineKeyboardButton]]:
         """构建引流按钮（从配置读取）"""
         from src.config import settings
-        
+
         try:
             # 解析配置的按钮
             buttons_config = settings.promotion_buttons
             # 移除换行和多余空格
-            buttons_config = buttons_config.replace('\n', '').replace(' ', '')
+            buttons_config = buttons_config.replace("\n", "").replace(" ", "")
             # 解析为列表（安全地使用JSON）
-            button_rows = json.loads(f'[{buttons_config}]')
-            
+            button_rows = json.loads(f"[{buttons_config}]")
+
             keyboard = []
             for row in button_rows:
                 button_row = []
                 for btn in row:
-                    text = btn.get('text', '')
-                    url = btn.get('url')
-                    callback = btn.get('callback')
-                    
+                    text = btn.get("text", "")
+                    url = btn.get("url")
+                    callback = btn.get("callback")
+
                     if url:
                         # 外部链接按钮
                         button_row.append(InlineKeyboardButton(text, url=url))
                     elif callback:
                         # 回调按钮
                         button_row.append(InlineKeyboardButton(text, callback_data=callback))
-                
+
                 if button_row:
                     keyboard.append(button_row)
-            
+
             return keyboard
         except Exception as e:
             logger.error(f"解析引流按钮配置失败: {e}")
@@ -233,18 +208,18 @@ class MainMenuModule(BaseModule):
             return [
                 [
                     InlineKeyboardButton("💎 Premium会员", callback_data="menu_premium"),
-                    InlineKeyboardButton("👤 个人中心", callback_data="menu_profile")
+                    InlineKeyboardButton("👤 个人中心", callback_data="menu_profile"),
                 ],
                 [
                     InlineKeyboardButton("🔍 地址查询", callback_data="menu_address_query"),
-                    InlineKeyboardButton("⚡ 能量兑换", callback_data="menu_energy")
+                    InlineKeyboardButton("⚡ 能量兑换", callback_data="menu_energy"),
                 ],
                 [
                     InlineKeyboardButton("🎁 免费克隆", callback_data="menu_clone"),
-                    InlineKeyboardButton("👨‍💼 联系客服", callback_data="menu_support")
-                ]
+                    InlineKeyboardButton("👨‍💼 联系客服", callback_data="menu_support"),
+                ],
             ]
-    
+
     def _build_reply_keyboard(self) -> ReplyKeyboardMarkup:
         """构建底部回复键盘"""
         reply_keyboard = [
@@ -258,73 +233,52 @@ class MainMenuModule(BaseModule):
             resize_keyboard=True,
             one_time_keyboard=False,
         )
-    
+
     async def handle_support(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """处理联系客服按钮"""
         from src.config import settings
-        
+
         query = update.callback_query
         await query.answer()
-        
+
         # 从配置获取客服联系方式
-        support_contact = getattr(settings, 'support_contact', '@your_support_bot')
-        
+        support_contact = getattr(settings, "support_contact", "@your_support_bot")
+
         text = (
-            "📞 <b>联系客服</b>\n\n"
-            f"如有任何问题，请联系客服：\n\n"
-            f"👨‍💼 {support_contact}\n\n"
-            "客服在线时间：09:00 - 23:00"
+            f"📞 <b>联系客服</b>\n\n如有任何问题，请联系客服：\n\n👨‍💼 {support_contact}\n\n客服在线时间：09:00 - 23:00"
         )
-        
-        keyboard = [
-            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
-        ]
+
+        keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await query.edit_message_text(
-            text,
-            parse_mode="HTML",
-            reply_markup=reply_markup
-        )
-    
+
+        await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+
     async def handle_orders(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """处理我的订单按钮"""
         from src.config import settings
-        
+
         query = update.callback_query
         await query.answer()
-        
+
         user_id = update.effective_user.id
-        is_admin = user_id == getattr(settings, 'bot_owner_id', 0)
-        
+        is_admin = user_id == getattr(settings, "bot_owner_id", 0)
+
         if is_admin:
             # 管理员：提示使用 /orders 命令
-            text = (
-                "📋 <b>订单管理</b>\n\n"
-                "请使用 /orders 命令进入订单管理系统。\n\n"
-                "您可以查看、筛选和管理所有订单。"
-            )
+            text = "📋 <b>订单管理</b>\n\n请使用 /orders 命令进入订单管理系统。\n\n您可以查看、筛选和管理所有订单。"
         else:
             # 普通用户：显示订单查询说明
-            text = (
-                "📋 <b>我的订单</b>\n\n"
-                "暂不支持用户自助查询订单。\n\n"
-                "如需查询订单状态，请联系客服提供订单号。"
-            )
-        
+            text = "📋 <b>我的订单</b>\n\n暂不支持用户自助查询订单。\n\n如需查询订单状态，请联系客服提供订单号。"
+
         keyboard = [
             [InlineKeyboardButton("📞 联系客服", callback_data="menu_support")],
-            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await query.edit_message_text(
-            text,
-            parse_mode="HTML",
-            reply_markup=reply_markup
-        )
-    
-    def _build_rates_text(self, rates_data: Dict[str, Any], channel: str = "all") -> str:
+
+        await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+
+    def _build_rates_text(self, rates_data: dict[str, Any], channel: str = "all") -> str:
         """
         构建汇率显示文本
 
@@ -347,10 +301,7 @@ class MainMenuModule(BaseModule):
                 ch_data = rates_data.get(ch, {})
                 merchants = ch_data.get("merchants", [])
                 for m in merchants:
-                    all_merchants.append({
-                        "price": m.get("price", 0),
-                        "name": m.get("name", "商家")
-                    })
+                    all_merchants.append({"price": m.get("price", 0), "name": m.get("name", "商家")})
             # 按价格排序
             all_merchants.sort(key=lambda x: x["price"])
             top10 = all_merchants[:10]
@@ -395,10 +346,7 @@ class MainMenuModule(BaseModule):
 
         row = [InlineKeyboardButton(name, callback_data=f"rate_channel_{key}") for key, name in channels]
 
-        return InlineKeyboardMarkup([
-            row,
-            [InlineKeyboardButton("🚫 关闭", callback_data="rate_close")]
-        ])
+        return InlineKeyboardMarkup([row, [InlineKeyboardButton("🚫 关闭", callback_data="rate_close")]])
 
     async def show_rates(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """
@@ -424,9 +372,7 @@ class MainMenuModule(BaseModule):
         except Exception as e:
             logger.error(f"获取汇率失败: {e}", exc_info=True)
             text = "❌ <b>获取汇率失败</b>\n\n请稍后重试。"
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
-            ])
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]])
 
         # 删除"正在获取"提示
         try:
@@ -435,11 +381,7 @@ class MainMenuModule(BaseModule):
             pass
 
         # 发送结果
-        await update.message.reply_text(
-            text,
-            parse_mode="HTML",
-            reply_markup=keyboard
-        )
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=keyboard)
 
     async def handle_rate_channel(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """处理汇率渠道切换"""
@@ -464,9 +406,9 @@ class MainMenuModule(BaseModule):
                 await query.edit_message_text(
                     "❌ <b>获取汇率失败</b>\n\n请稍后重试。",
                     parse_mode="HTML",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
-                    ])
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]]
+                    ),
                 )
                 return
 
@@ -474,11 +416,7 @@ class MainMenuModule(BaseModule):
         text = self._build_rates_text(rates_data, channel)
         keyboard = self._build_rates_keyboard(channel)
 
-        await query.edit_message_text(
-            text,
-            parse_mode="HTML",
-            reply_markup=keyboard
-        )
+        await query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
 
     async def handle_rate_close(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """处理关闭汇率显示"""
@@ -494,52 +432,37 @@ class MainMenuModule(BaseModule):
         except Exception:
             # 如果删除失败，显示简短消息
             await query.edit_message_text("✅ 已关闭汇率显示")
-    
+
     async def show_clone_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """
         显示免费克隆信息（底部键盘按钮）
         """
-        text = get_content("clone_message", default=(
-            "🎁 <b>免费克隆</b>\n\n"
-            "本功能暂未开放，敬请期待！\n\n"
-            "如有需求，请联系客服咨询。"
-        ))
-        
+        text = get_content(
+            "clone_message", default=("🎁 <b>免费克隆</b>\n\n本功能暂未开放，敬请期待！\n\n如有需求，请联系客服咨询。")
+        )
+
         keyboard = [
             [InlineKeyboardButton("📞 联系客服", callback_data="menu_support")],
-            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(
-            text,
-            parse_mode="HTML",
-            reply_markup=reply_markup
-        )
-    
+
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+
     async def show_support_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """
         显示联系客服信息（底部键盘按钮）
         """
         from src.config import settings
-        
+
         # 从配置获取客服联系方式
-        support_contact = getattr(settings, 'support_contact', '@your_support_bot')
-        
+        support_contact = getattr(settings, "support_contact", "@your_support_bot")
+
         text = (
-            "📞 <b>联系客服</b>\n\n"
-            f"如有任何问题，请联系客服：\n\n"
-            f"👨‍💼 {support_contact}\n\n"
-            "客服在线时间：09:00 - 23:00"
+            f"📞 <b>联系客服</b>\n\n如有任何问题，请联系客服：\n\n👨‍💼 {support_contact}\n\n客服在线时间：09:00 - 23:00"
         )
-        
-        keyboard = [
-            [InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]
-        ]
+
+        keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="nav_back_to_main")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(
-            text,
-            parse_mode="HTML",
-            reply_markup=reply_markup
-        )
+
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
