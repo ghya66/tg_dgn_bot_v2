@@ -248,21 +248,29 @@ def mock_context():
 def build_test_app_v2():
     """
     构建 V2 测试 Application（完全离线模式）
-    
+
     参考 src/bot_v2.py 的逻辑，但不连接 Telegram API。
-    
+    使用纯 Mock 方式以避免 weakref 和版本兼容性问题。
+
     Returns:
         Application: 配置好的测试 Application
     """
     from telegram.ext import Application
 
-    # 创建 Application（使用假 token，不会连接网络）
-    # 禁用 JobQueue 以避免 weakref 兼容性问题
-    app = Application.builder().token("TEST:BOT_TOKEN_FOR_TESTING").job_queue(None).build()
-    
+    # 方法1：使用 Application.builder() 但完全禁用所有可能导致问题的组件
+    # 禁用 JobQueue、Updater、所有后台任务
+    app = (
+        Application.builder()
+        .token("TEST:BOT_TOKEN_FOR_TESTING")
+        .job_queue(None)  # 禁用 JobQueue（避免 weakref 问题）
+        .updater(None)    # 禁用 Updater（避免网络连接）
+        .concurrent_updates(False)  # 禁用并发更新
+        .build()
+    )
+
     # 设置 Application 为已初始化状态（绕过初始化检查）
     app._initialized = True
-    
+
     # Mock 所有会触发网络请求的 bot 方法
     app.bot = MagicMock()
     app.bot.initialize = AsyncMock()
@@ -282,7 +290,7 @@ def build_test_app_v2():
     app.bot.delete_message = AsyncMock()
     app.bot.copy_message = AsyncMock()
     app.bot.forward_message = AsyncMock()
-    
+
     return app
 
 

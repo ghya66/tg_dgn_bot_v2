@@ -41,8 +41,8 @@ pandas>=2.2.0  # Python 3.13 需要 2.2.0+
 python-dotenv==1.0.0
 
 # === 测试 ===
-pytest>=8.0.0  # 需要 8.0+ 与 pytest-asyncio 0.24+ 兼容
-pytest-asyncio>=0.24.0  # 修复 async fixture 兼容性问题
+pytest>=8.0.0  # 需要 8.0+ 与 pytest-asyncio 兼容
+pytest-asyncio>=1.0.0  # 需要 1.0+ 支持 asyncio_default_fixture_loop_scope
 pytest-timeout>=2.3.0
 pytest-cov>=4.1.0
 fakeredis>=2.20.0
