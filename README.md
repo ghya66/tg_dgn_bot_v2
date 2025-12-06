@@ -5,10 +5,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.11+-blue.svg" alt="Python">
+  <a href="https://github.com/ghya66/tg_dgn_bot_v2/actions/workflows/ci.yml"><img src="https://github.com/ghya66/tg_dgn_bot_v2/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Python-3.11%20|%203.12-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/Telegram-Bot%20API-blue.svg" alt="Telegram">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
-  <img src="https://img.shields.io/badge/Version-2.0.1-orange.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-2.0.2-orange.svg" alt="Version">
 </p>
 
 ---
