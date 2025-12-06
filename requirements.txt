@@ -46,3 +46,8 @@ pytest-asyncio>=1.0.0  # 需要 1.0+ 支持 asyncio_default_fixture_loop_scope
 pytest-timeout>=2.3.0
 pytest-cov>=4.1.0
 fakeredis>=2.20.0
+
+# === 代码审计工具 ===
+ruff>=0.8.0           # 代码风格检查和格式化
+mypy>=1.13.0          # 静态类型检查
+bandit>=1.7.0         # 安全漏洞扫描
