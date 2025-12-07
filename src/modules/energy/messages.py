@@ -7,14 +7,14 @@
 class EnergyMessages:
     """能量兑换的所有消息模板"""
 
-    # 主菜单
-    MAIN_MENU = """⚡ <b>能量兑换服务</b>
+    # 主菜单模板（使用占位符支持动态价格）
+    MAIN_MENU_TEMPLATE = """⚡ <b>能量兑换服务</b>
 
 选择兑换类型：
 
 ⚡ <b>时长能量（闪租）</b>
-  • 6.5万能量 = 3 TRX
-  • 13.1万能量 = 6 TRX
+  • 6.5万能量 = {price_small} TRX
+  • 13.1万能量 = {price_large} TRX
   • 有效期：1小时
   • 支付方式：TRX 转账
   • 6秒到账
@@ -30,21 +30,51 @@ class EnergyMessages:
   • 支付方式：USDT 转账
   • 订单有效期：{timeout_minutes} 分钟"""
 
-    # 时长能量套餐
-    HOURLY_PACKAGES = """⚡ <b>时长能量（闪租）</b>
+    # 时长能量套餐模板（使用占位符支持动态价格）
+    HOURLY_PACKAGES_TEMPLATE = """⚡ <b>时长能量（闪租）</b>
 
 选择能量套餐：
 
-• <b>6.5万能量</b> = 3 TRX
+• <b>6.5万能量</b> = {price_small} TRX
   有效期：1小时
 
-• <b>13.1万能量</b> = 6 TRX
+• <b>13.1万能量</b> = {price_large} TRX
   有效期：1小时
 
 ⚡ 特点：
   • 6秒到账
   • TRX 直接转账
   • 适合临时使用"""
+
+    @classmethod
+    def get_main_menu(cls, timeout_minutes: int, price_small: float = 3.0, price_large: float = 6.0) -> str:
+        """
+        获取主菜单消息（支持动态价格）
+
+        Args:
+            timeout_minutes: 订单超时时间
+            price_small: 小能量价格（TRX）
+            price_large: 大能量价格（TRX）
+        """
+        return cls.MAIN_MENU_TEMPLATE.format(
+            timeout_minutes=timeout_minutes,
+            price_small=int(price_small) if price_small == int(price_small) else price_small,
+            price_large=int(price_large) if price_large == int(price_large) else price_large,
+        )
+
+    @classmethod
+    def get_hourly_packages(cls, price_small: float = 3.0, price_large: float = 6.0) -> str:
+        """
+        获取时长能量套餐消息（支持动态价格）
+
+        Args:
+            price_small: 小能量价格（TRX）
+            price_large: 大能量价格（TRX）
+        """
+        return cls.HOURLY_PACKAGES_TEMPLATE.format(
+            price_small=int(price_small) if price_small == int(price_small) else price_small,
+            price_large=int(price_large) if price_large == int(price_large) else price_large,
+        )
 
     # 笔数套餐
     PACKAGE_INFO = """📦 <b>笔数套餐</b>

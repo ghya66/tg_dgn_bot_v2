@@ -536,8 +536,8 @@ class AdminHandler:
         success = config_manager.set_content("welcome_message", new_text, update.effective_user.id, "欢迎语")
 
         if success:
-            # 清除缓存
-            from src.common.content_service import clear_content_cache
+            # 清除缓存（使用统一的缓存管理器）
+            from src.utils.content_helper import clear_content_cache
 
             clear_content_cache("welcome_message")
 
@@ -566,7 +566,8 @@ class AdminHandler:
         success = config_manager.set_content("free_clone_message", new_text, update.effective_user.id, "免费克隆文案")
 
         if success:
-            from src.common.content_service import clear_content_cache
+            # 清除缓存（使用统一的缓存管理器）
+            from src.utils.content_helper import clear_content_cache
 
             clear_content_cache("free_clone_message")
 
@@ -596,7 +597,8 @@ class AdminHandler:
         success = config_manager.set_content("support_contact", new_text, update.effective_user.id, "客服联系方式")
 
         if success:
-            from src.common.content_service import clear_content_cache
+            # 清除缓存（使用统一的缓存管理器）
+            from src.utils.content_helper import clear_content_cache
 
             clear_content_cache("support_contact")
 

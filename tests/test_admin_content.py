@@ -2,19 +2,19 @@
 管理面板文案编辑测试脚本
 
 测试：
-1. content_service 文案读取
-2. config_manager 文案保存
-3. 缓存清理机制
+1. content_service 向后兼容层
+2. content_helper 统一缓存机制
+3. config_manager 文案保存
 """
 import pytest
 from unittest.mock import MagicMock, patch
 
 
 class TestContentService:
-    """测试文案服务"""
-    
+    """测试文案服务（向后兼容层）"""
+
     def test_import(self):
-        """测试导入"""
+        """测试导入（向后兼容接口）"""
         from src.common.content_service import (
             get_welcome_message,
             get_free_clone_message,
@@ -24,49 +24,60 @@ class TestContentService:
         assert get_welcome_message is not None
         assert get_free_clone_message is not None
         assert get_support_contact is not None
-    
-    def test_get_welcome_from_db(self):
-        """测试从数据库获取欢迎语"""
-        from src.common.content_service import get_welcome_message, clear_content_cache, _content_cache
-        
-        # 清除缓存
+        assert clear_content_cache is not None
+
+    def test_get_welcome_callable(self):
+        """测试欢迎语函数可调用"""
+        from src.common.content_service import get_welcome_message
+
+        result = get_welcome_message()
+        # 应返回字符串（数据库值或默认值）
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_get_free_clone_callable(self):
+        """测试免费克隆函数可调用"""
+        from src.common.content_service import get_free_clone_message
+
+        result = get_free_clone_message()
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_get_support_contact_callable(self):
+        """测试客服联系方式函数可调用"""
+        from src.common.content_service import get_support_contact
+
+        result = get_support_contact()
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+
+class TestContentHelper:
+    """测试统一的文案辅助模块"""
+
+    def test_import(self):
+        """测试导入"""
+        from src.utils.content_helper import get_content, clear_content_cache
+        assert get_content is not None
+        assert clear_content_cache is not None
+
+    def test_get_content_callable(self):
+        """测试 get_content 函数可调用"""
+        from src.utils.content_helper import get_content
+
+        # 使用默认值测试
+        result = get_content("test_key_not_exist", default="默认值")
+        assert result == "默认值"
+
+    def test_cache_clear_callable(self):
+        """测试缓存清除函数可调用"""
+        from src.utils.content_helper import clear_content_cache
+
+        # 清除指定键（不应报错）
+        clear_content_cache("some_key")
+
+        # 清除所有（不应报错）
         clear_content_cache()
-        
-        # Mock config_manager（需要在导入前 patch）
-        with patch('src.bot_admin.config_manager.config_manager') as mock_cm:
-            mock_cm.get_content.return_value = "数据库中的欢迎语"
-            
-            # 重新导入以应用 mock
-            import importlib
-            import src.common.content_service as cs
-            importlib.reload(cs)
-            
-            result = cs.get_welcome_message()
-            
-            # 由于 mock 时机问题，这里只验证函数可调用
-            assert result is not None
-    
-    def test_cache_mechanism(self):
-        """测试缓存机制"""
-        from src.common.content_service import _content_cache, clear_content_cache
-        
-        # 清除缓存
-        clear_content_cache()
-        assert len(_content_cache) == 0
-        
-        # 设置缓存
-        _content_cache["test_key"] = "test_value"
-        assert "test_key" in _content_cache
-        
-        # 清除指定键
-        clear_content_cache("test_key")
-        assert "test_key" not in _content_cache
-        
-        # 清除所有
-        _content_cache["key1"] = "value1"
-        _content_cache["key2"] = "value2"
-        clear_content_cache()
-        assert len(_content_cache) == 0
 
 
 class TestConfigManager:

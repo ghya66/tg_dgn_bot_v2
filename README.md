@@ -67,20 +67,82 @@ TG DGN Bot V2 是一个基于 Python 的 Telegram Bot，提供以下核心服务
 
 ## 🚀 快速开始
 
-### 1. 克隆项目
+### 方式一：Docker 部署（推荐）
+
+> ⚡ **推荐使用 Docker 部署**，无需手动安装 Python、Redis 等依赖。
+
+#### 1. 准备配置文件
+
+```bash
+# 复制配置模板
+cp .env.example .env
+
+# 编辑配置文件（填写必填项）
+nano .env
+```
+
+**必须填写的配置项：**
+
+```ini
+BOT_TOKEN=your_bot_token_here           # 从 @BotFather 获取
+BOT_OWNER_ID=123456789                  # 管理员 Telegram ID
+USDT_TRC20_RECEIVE_ADDR=TXxx...xxx      # USDT 收款地址
+WEBHOOK_SECRET=your_secret_key_32_chars # 签名密钥
+
+# 生产环境必改
+ENV=prod
+USE_WEBHOOK=true
+BOT_WEBHOOK_URL=https://your-domain.com/webhook
+```
+
+#### 2. 启动服务
+
+```bash
+# 创建数据目录
+mkdir -p data
+
+# 构建并启动
+docker compose up -d
+
+# 查看日志
+docker compose logs -f bot_primary
+```
+
+#### 3. 初始化配置
+
+```bash
+# 初始化价格和系统设置
+docker compose exec bot_primary python scripts/init_admin_config.py
+
+# 初始化文案配置
+docker compose exec bot_primary python scripts/init_content_configs.py
+```
+
+#### 4. 验证部署
+
+- 向 Bot 发送 `/start`，确认收到欢迎消息
+- 发送 `/admin`，确认进入管理面板
+
+> 📖 详细部署指南请参考 [生产环境部署文档](docs/PRODUCTION_INSTALL.md)
+
+---
+
+### 方式二：手动部署
+
+#### 1. 克隆项目
 
 ```bash
 git clone https://github.com/your-repo/tg_dgn_bot_v2.git
 cd tg_dgn_bot_v2
 ```
 
-### 2. 安装依赖
+#### 2. 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. 配置环境变量
+#### 3. 配置环境变量
 
 ```bash
 cp .env.example .env
@@ -103,7 +165,7 @@ REDIS_PORT=6379
 DATABASE_URL=sqlite:///./data/tg_bot.db
 ```
 
-### 4. 启动 Redis
+#### 4. 启动 Redis
 
 ```bash
 # Ubuntu/Debian
@@ -116,7 +178,7 @@ brew install redis && redis-server
 sudo service redis-server start
 ```
 
-### 5. 启动 Bot
+#### 5. 启动 Bot
 
 ```bash
 # 使用启动脚本
@@ -126,7 +188,7 @@ sudo service redis-server start
 python -m src.bot_v2
 ```
 
-### 6. 验证部署
+#### 6. 验证部署
 
 在 Telegram 中找到你的 Bot，发送 `/start`，应该看到欢迎消息和功能按钮。
 
@@ -305,18 +367,30 @@ pytest tests/ --cov=src --cov-report=html
 
 | 文档 | 说明 |
 |------|------|
+| [PRODUCTION_INSTALL.md](docs/PRODUCTION_INSTALL.md) | 🚀 **生产环境部署指南**（推荐） |
 | [QUICK_START.md](docs/QUICK_START.md) | 快速上手指南 |
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md) | 部署和测试指南 |
 | [API_REFERENCE.md](docs/API_REFERENCE.md) | REST API 文档 |
 | [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) | 数据库结构 |
 | [ADMIN_PANEL_GUIDE.md](docs/ADMIN_PANEL_GUIDE.md) | 管理后台指南 |
-| [CODE_REVIEW_REPORT.md](docs/CODE_REVIEW_REPORT.md) | 代码审查报告 |
+| [schema.sql](docs/schema.sql) | 数据库表结构 SQL |
 
 ---
 
 ## 🔄 更新日志
 
-### v2.0.2 (2025-12-06) - 生产就绪版本 🚀
+### v2.0.2 (2025-12-07) - 生产就绪版本 🚀
+
+**🔥 配置热更新**
+- ✅ **P0 修复**：欢迎语、免费克隆文案、客服联系方式支持热更新（无需重启）
+- ✅ **P1 修复**：Premium 价格、能量价格支持热更新（无需重启）
+- ✅ 统一缓存系统：`content_helper` 集中管理内容配置
+- ✅ 动态价格读取：所有价格从 `config_manager.get_price()` 实时获取
+
+**🐳 Docker 部署优化**
+- ✅ 简化 `docker-compose.yml`：移除 `bot_secondary`，优化生产配置
+- ✅ 添加容器健康检查（Redis + Bot）
+- ✅ 新增 `docs/PRODUCTION_INSTALL.md` 生产环境部署指南
 
 **核心功能**
 - ✅ 能量订单状态同步任务：自动每5分钟从 trxfast.com 同步订单状态

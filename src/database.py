@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 
 # 数据库配置
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./tg_bot.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/tg_bot.db")
 
 # 创建引擎
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})

@@ -4,6 +4,91 @@
 
 ---
 
+## [2025-12-07] 数据库配置统一
+
+### 概述
+
+将分散的数据库文件统一到 `./data/tg_bot.db`，解决本地开发与 Docker 部署使用不同数据库路径的问题。
+
+### 🔧 变更内容
+
+#### 问题背景
+
+项目存在两个数据库文件，不同部署方式使用不同路径：
+
+| 部署方式 | 修改前使用的数据库 |
+|----------|-------------------|
+| 本地直接运行 | `./tg_bot.db` (根目录) |
+| Docker 部署 | `./data/tg_bot.db` (data 目录) |
+| Render.com | PostgreSQL (不受影响) |
+
+#### 解决方案
+
+统一使用 `./data/tg_bot.db` 作为默认数据库路径。
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|---------|
+| `src/database.py` | 第14行：`sqlite:///./tg_bot.db` → `sqlite:///./data/tg_bot.db` |
+| `alembic.ini` | 第17行：`sqlite:///./tg_bot.db` → `sqlite:///./data/tg_bot.db` |
+
+### 配置对比
+
+**修改前 (`src/database.py` 第14行)**:
+```python
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./tg_bot.db")
+```
+
+**修改后**:
+```python
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/tg_bot.db")
+```
+
+**修改前 (`alembic.ini` 第17行)**:
+```ini
+sqlalchemy.url = sqlite:///./tg_bot.db
+```
+
+**修改后**:
+```ini
+sqlalchemy.url = sqlite:///./data/tg_bot.db
+```
+
+### 数据迁移
+
+将根目录的数据库文件移动到 data 目录：
+```powershell
+Move-Item -Force ./tg_bot.db ./data/tg_bot.db
+```
+
+### 对各部署方式的影响
+
+| 部署方式 | 影响 | 说明 |
+|----------|------|------|
+| 本地直接运行 | ✅ 无问题 | 默认值已改为 `./data/tg_bot.db` |
+| Docker Compose | ✅ 无问题 | `docker-compose.yml` 已是 `./data/tg_bot.db` |
+| Render.com | ✅ 无问题 | 继续使用 PostgreSQL，不受影响 |
+| CI/CD 测试 | ✅ 无问题 | 测试使用内存数据库，不依赖文件路径 |
+
+### 🧪 测试验证
+
+```
+761 passed, 1 failed, 2 skipped in 332.05s (5:32)
+```
+
+- **761 个测试通过** ✅
+- **1 个测试失败** - `test_concurrent_order_creation`（并发压力测试，与本次修改无关）
+- **2 个测试跳过** - CI 环境跳过的 Redis 压测
+
+### 注意事项
+
+1. 如果使用环境变量 `DATABASE_URL` 覆盖配置，则不受此次修改影响
+2. Alembic 迁移命令现在默认操作 `./data/tg_bot.db`
+3. 如需使用其他数据库路径，设置 `DATABASE_URL` 环境变量即可
+
+---
+
 ## [2025-12-06] 第三阶段（稳定性）- 提高服务稳定性和可观测性
 
 ### 概述

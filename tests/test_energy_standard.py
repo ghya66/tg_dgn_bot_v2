@@ -260,8 +260,9 @@ class TestEnergyModule:
     @pytest.mark.asyncio
     async def test_message_templates_html_format(self):
         """测试所有消息模板都是HTML格式"""
-        assert "<b>" in EnergyMessages.MAIN_MENU
-        assert "<b>" in EnergyMessages.HOURLY_PACKAGES
+        # 使用动态方法获取消息（支持热更新）
+        assert "<b>" in EnergyMessages.get_main_menu(timeout_minutes=30)
+        assert "<b>" in EnergyMessages.get_hourly_packages()
         assert "<b>" in EnergyMessages.PACKAGE_INFO
         assert "<b>" in EnergyMessages.FLASH_EXCHANGE
         assert "<b>" in EnergyMessages.INPUT_ADDRESS

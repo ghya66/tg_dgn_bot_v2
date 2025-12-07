@@ -1,13 +1,33 @@
+# ============================================
+# tg_dgn_bot_v2 生产环境 Docker Compose 配置
+# ============================================
+#
+# 使用方法:
+#   1. 复制 .env.example 为 .env 并填写配置
+#   2. docker compose up -d
+#   3. docker compose logs -f bot_primary
+#
+# ============================================
+
 services:
+  # Redis 缓存服务
   redis:
     image: redis:7-alpine
+    container_name: tg_bot_redis
     restart: unless-stopped
     ports:
       - "6379:6379"
     command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
+  # Telegram Bot 主服务
   bot_primary:
     build: .
+    container_name: tg_bot_primary
     restart: unless-stopped
     env_file:
       - .env
@@ -16,34 +36,20 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - USE_WEBHOOK=${USE_WEBHOOK:-true}
       - BOT_SERVICE_HOST=0.0.0.0
-      - BOT_SERVICE_PORT=${BOT_PRIMARY_PORT:-8080}
-      - BOT_WEBHOOK_URL=${BOT_PRIMARY_WEBHOOK_URL:-https://your-domain.com/bot-primary}
+      - BOT_SERVICE_PORT=${BOT_SERVICE_PORT:-8080}
+      - BOT_WEBHOOK_URL=${BOT_WEBHOOK_URL:-}
       - BOT_INSTANCE_NAME=primary
+      - DATABASE_URL=sqlite:///./data/tg_bot.db
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     ports:
-      - "${BOT_PRIMARY_PORT:-8080}:${BOT_PRIMARY_PORT:-8080}"
+      - "${BOT_SERVICE_PORT:-8080}:${BOT_SERVICE_PORT:-8080}"
     volumes:
       - ./data:/app/data
-      - ./tg_bot.db:/app/tg_bot.db
-
-  bot_secondary:
-    build: .
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-      - USE_WEBHOOK=${USE_WEBHOOK:-true}
-      - BOT_SERVICE_HOST=0.0.0.0
-      - BOT_SERVICE_PORT=${BOT_SECONDARY_PORT:-8081}
-      - BOT_WEBHOOK_URL=${BOT_SECONDARY_WEBHOOK_URL:-https://your-domain.com/bot-secondary}
-      - BOT_INSTANCE_NAME=secondary
-    depends_on:
-      - redis
-    ports:
-      - "${BOT_SECONDARY_PORT:-8081}:${BOT_SECONDARY_PORT:-8081}"
-    volumes:
-      - ./data:/app/data
-      - ./tg_bot.db:/app/tg_bot.db
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${BOT_SERVICE_PORT:-8080}/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

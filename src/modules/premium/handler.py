@@ -37,8 +37,24 @@ logger = logging.getLogger(__name__)
 class PremiumModule(BaseModule):
     """标准化的Premium模块"""
 
-    # 套餐配置 {months: price_usdt}
-    PACKAGES = {3: 17.0, 6: 25.0, 12: 40.0}
+    # 默认套餐价格（当数据库无配置时使用）
+    _DEFAULT_PACKAGES = {3: 17.0, 6: 25.0, 12: 40.0}
+
+    @property
+    def packages(self) -> dict[int, float]:
+        """
+        动态获取套餐价格配置（支持热更新）
+
+        从数据库读取价格，若无配置则使用默认值。
+        每次调用都从 config_manager 读取最新值，支持管理员修改后立即生效。
+        """
+        from src.bot_admin.config_manager import config_manager
+
+        return {
+            3: config_manager.get_price("premium_3_months", self._DEFAULT_PACKAGES[3]),
+            6: config_manager.get_price("premium_6_months", self._DEFAULT_PACKAGES[6]),
+            12: config_manager.get_price("premium_12_months", self._DEFAULT_PACKAGES[12]),
+        }
 
     def __init__(self, order_manager, suffix_manager, delivery_service, receive_address: str, bot_username: str = None):
         """
@@ -124,9 +140,10 @@ class PremiumModule(BaseModule):
         # 初始化模块状态
         self.state_manager.init_state(context, self.module_name)
 
-        # 格式化消息
+        # 格式化消息（使用动态价格）
+        prices = self.packages
         text = self.formatter.format_html(
-            PremiumMessages.START, price_3=self.PACKAGES[3], price_6=self.PACKAGES[6], price_12=self.PACKAGES[12]
+            PremiumMessages.START, price_3=prices[3], price_6=prices[6], price_12=prices[12]
         )
 
         keyboard = PremiumKeyboards.start_keyboard()
@@ -165,7 +182,7 @@ class PremiumModule(BaseModule):
             # 直接使用模板，因为username和nickname已经是安全的HTML
             text = PremiumMessages.SELECT_SELF.format(username=username_display, nickname=nickname_display)
 
-            keyboard = PremiumKeyboards.package_keyboard(self.PACKAGES)
+            keyboard = PremiumKeyboards.package_keyboard(self.packages)
 
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode="HTML")
 
@@ -304,7 +321,7 @@ class PremiumModule(BaseModule):
 
         text = PremiumMessages.SELECT_OTHER_CONFIRM.format(username=escaped_username, nickname=escaped_nickname)
 
-        keyboard = PremiumKeyboards.package_keyboard(self.PACKAGES)
+        keyboard = PremiumKeyboards.package_keyboard(self.packages)
 
         await query.edit_message_text(text, reply_markup=keyboard, parse_mode="HTML")
 
@@ -336,10 +353,14 @@ class PremiumModule(BaseModule):
         # 解析月数
         months = int(query.data.split("_")[1])
 
+        # 获取当前价格（支持热更新）
+        prices = self.packages
+        price = prices[months]
+
         # 保存状态
         state = self.state_manager.get_state(context, self.module_name)
         state["premium_months"] = months
-        state["base_amount"] = self.PACKAGES[months]
+        state["base_amount"] = price
 
         # 创建订单
         try:
@@ -359,7 +380,7 @@ class PremiumModule(BaseModule):
                 recipient_username=state.get("recipient_username"),
                 recipient_type=state["recipient_type"],
                 premium_months=months,
-                amount_usdt=self.PACKAGES[months],
+                amount_usdt=price,
                 status="PENDING",
                 expires_at=expires_at,
             )
@@ -372,7 +393,7 @@ class PremiumModule(BaseModule):
             # 同时创建支付订单
             payment_order = await self.order_manager.create_order(
                 user_id=update.effective_user.id,
-                base_amount=self.PACKAGES[months],
+                base_amount=price,
                 order_type=OrderType.PREMIUM,
                 premium_months=months,
                 recipients=[state.get("recipient_username")],

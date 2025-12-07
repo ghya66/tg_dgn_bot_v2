@@ -241,8 +241,8 @@ class MainMenuModule(BaseModule):
         query = update.callback_query
         await query.answer()
 
-        # 从配置获取客服联系方式
-        support_contact = getattr(settings, "support_contact", "@your_support_bot")
+        # 从数据库读取客服联系方式（支持热更新）
+        support_contact = get_content("support_contact", default=settings.support_contact)
 
         text = (
             f"📞 <b>联系客服</b>\n\n如有任何问题，请联系客服：\n\n👨‍💼 {support_contact}\n\n客服在线时间：09:00 - 23:00"
@@ -437,9 +437,10 @@ class MainMenuModule(BaseModule):
         """
         显示免费克隆信息（底部键盘按钮）
         """
-        text = get_content(
-            "clone_message", default=("🎁 <b>免费克隆</b>\n\n本功能暂未开放，敬请期待！\n\n如有需求，请联系客服咨询。")
-        )
+        from src.config import settings
+
+        # 使用与 handle_free_clone 相同的键名，确保管理员修改全局生效
+        text = get_content("free_clone_message", default=settings.free_clone_message)
 
         keyboard = [
             [InlineKeyboardButton("📞 联系客服", callback_data="menu_support")],
@@ -455,8 +456,8 @@ class MainMenuModule(BaseModule):
         """
         from src.config import settings
 
-        # 从配置获取客服联系方式
-        support_contact = getattr(settings, "support_contact", "@your_support_bot")
+        # 从数据库读取客服联系方式（支持热更新）
+        support_contact = get_content("support_contact", default=settings.support_contact)
 
         text = (
             f"📞 <b>联系客服</b>\n\n如有任何问题，请联系客服：\n\n👨‍💼 {support_contact}\n\n客服在线时间：09:00 - 23:00"

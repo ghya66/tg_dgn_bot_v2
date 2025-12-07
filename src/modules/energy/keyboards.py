@@ -20,11 +20,21 @@ class EnergyKeyboards:
         return InlineKeyboardMarkup(keyboard)
 
     @staticmethod
-    def hourly_packages():
-        """时长能量套餐键盘"""
+    def hourly_packages(price_small: float = 3.0, price_large: float = 6.0):
+        """
+        时长能量套餐键盘（支持动态价格）
+
+        Args:
+            price_small: 小能量价格（TRX）
+            price_large: 大能量价格（TRX）
+        """
+        # 格式化价格显示（整数不显示小数点）
+        price_small_str = int(price_small) if price_small == int(price_small) else price_small
+        price_large_str = int(price_large) if price_large == int(price_large) else price_large
+
         keyboard = [
-            [InlineKeyboardButton("⚡ 6.5万能量 (3 TRX)", callback_data="energy_pkg_65k")],
-            [InlineKeyboardButton("⚡ 13.1万能量 (6 TRX)", callback_data="energy_pkg_131k")],
+            [InlineKeyboardButton(f"⚡ 6.5万能量 ({price_small_str} TRX)", callback_data="energy_pkg_65k")],
+            [InlineKeyboardButton(f"⚡ 13.1万能量 ({price_large_str} TRX)", callback_data="energy_pkg_131k")],
             [InlineKeyboardButton("🔙 返回", callback_data="energy_back")],
             [InlineKeyboardButton("❌ 取消", callback_data="energy_cancel")],
         ]

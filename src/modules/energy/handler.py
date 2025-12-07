@@ -126,8 +126,14 @@ class EnergyModule(BaseModule):
         # 获取超时时间
         timeout_minutes = self._get_timeout_minutes(context)
 
-        # 格式化消息
-        text = EnergyMessages.MAIN_MENU.format(timeout_minutes=timeout_minutes)
+        # 从配置管理器读取价格（支持热更新）
+        from src.bot_admin.config_manager import config_manager
+
+        price_small = config_manager.get_price("energy_small", 3.0)
+        price_large = config_manager.get_price("energy_large", 6.0)
+
+        # 格式化消息（使用动态价格）
+        text = EnergyMessages.get_main_menu(timeout_minutes, price_small, price_large)
 
         # 发送消息
         await send_method(text=text, reply_markup=EnergyKeyboards.main_menu(), parse_mode="HTML")
@@ -161,9 +167,17 @@ class EnergyModule(BaseModule):
 
     async def _show_hourly_packages(self, query, context: ContextTypes.DEFAULT_TYPE) -> int:
         """显示时长能量套餐"""
-        text = EnergyMessages.HOURLY_PACKAGES
+        # 从配置管理器读取价格（支持热更新）
+        from src.bot_admin.config_manager import config_manager
 
-        await query.edit_message_text(text=text, reply_markup=EnergyKeyboards.hourly_packages(), parse_mode="HTML")
+        price_small = config_manager.get_price("energy_small", 3.0)
+        price_large = config_manager.get_price("energy_large", 6.0)
+
+        text = EnergyMessages.get_hourly_packages(price_small, price_large)
+
+        await query.edit_message_text(
+            text=text, reply_markup=EnergyKeyboards.hourly_packages(price_small, price_large), parse_mode="HTML"
+        )
 
         return STATE_SELECT_PACKAGE
 
@@ -192,13 +206,16 @@ class EnergyModule(BaseModule):
         data = query.data
         logger.info(f"用户 {user_id} 选择套餐: {data}")
 
+        # 从配置管理器读取价格（支持热更新）
+        from src.bot_admin.config_manager import config_manager
+
         # 解析套餐 - 直接保存到context.user_data
         if data == "energy_pkg_65k":
             context.user_data["energy_amount"] = 65000
-            context.user_data["price_trx"] = 3
+            context.user_data["price_trx"] = config_manager.get_price("energy_small", 3.0)
         elif data == "energy_pkg_131k":
             context.user_data["energy_amount"] = 131000
-            context.user_data["price_trx"] = 6
+            context.user_data["price_trx"] = config_manager.get_price("energy_large", 6.0)
         else:
             return STATE_SELECT_PACKAGE
 
@@ -219,9 +236,13 @@ class EnergyModule(BaseModule):
         context.user_data.pop("energy_amount", None)
         context.user_data.pop("price_trx", None)
 
-        # 显示主菜单
+        # 显示主菜单（使用动态价格）
+        from src.bot_admin.config_manager import config_manager
+
         timeout_minutes = self._get_timeout_minutes(context)
-        text = EnergyMessages.MAIN_MENU.format(timeout_minutes=timeout_minutes)
+        price_small = config_manager.get_price("energy_small", 3.0)
+        price_large = config_manager.get_price("energy_large", 6.0)
+        text = EnergyMessages.get_main_menu(timeout_minutes, price_small, price_large)
 
         await query.edit_message_text(text=text, reply_markup=EnergyKeyboards.main_menu(), parse_mode="HTML")
 
